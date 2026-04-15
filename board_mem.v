@@ -1,0 +1,89 @@
+/* board memory file
+
+Marshall Graves & Sheel Shah --- FPGA Chess
+4/14/26
+
+Chess Piece Encoding:
+4-bits: 0000
+
+MSB: 0- white, 1- black
+
+3 LSB - piece encodings:
+000- empty
+001- pawn
+010- knight
+011- bishop
+100- rook
+101- queen
+110- king
+111- not used
+
+0000 & 1000 are the same
+0111 & 1111 not used
+
+*/
+
+module board_mem (
+    input clk,
+    input reset,
+    input [5:0] wr_addr, // write address -- 2^6 == 64 addresses
+    input [3:0] wr_data, // write data -- 4 bit piece encoding data
+    input wr_en, // write enable
+    input [5:0] rd_addr, // read address
+    output [3:0] rd_data // read data
+);
+
+    reg [3:0] board [0:63]; // board memory init
+
+    assign rd_data = board[rd_addr]; // read functionality
+
+    // write and reset/init functionality
+    integer i;
+    always @(posedge clk) begin
+        // reset/init funcitonality
+        if (reset) begin // synchronous reset
+            for (i = 0; i < 64; i = i + 1) // blank out all 64 squares
+                board[i] <= 4'b0000;
+
+            board[0]  <= 4'b1100; // black rook
+            board[1]  <= 4'b1010; // black knight
+            board[2]  <= 4'b1011; // black bishop
+            board[3]  <= 4'b1101; // black queen
+            board[4]  <= 4'b1110; // black king
+            board[5]  <= 4'b1011; // black bishop
+            board[6]  <= 4'b1010; // black knight
+            board[7]  <= 4'b1100; // black rook
+
+            board[8]  <= 4'b1001; // black pawn
+            board[9]  <= 4'b1001; // black pawn
+            board[10] <= 4'b1001; // black pawn
+            board[11] <= 4'b1001; // black pawn
+            board[12] <= 4'b1001; // black pawn
+            board[13] <= 4'b1001; // black pawn
+            board[14] <= 4'b1001; // black pawn
+            board[15] <= 4'b1001; // black pawn
+
+            board[48] <= 4'b0001; // white pawn
+            board[49] <= 4'b0001; // white pawn
+            board[50] <= 4'b0001; // white pawn
+            board[51] <= 4'b0001; // white pawn
+            board[52] <= 4'b0001; // white pawn
+            board[53] <= 4'b0001; // white pawn
+            board[54] <= 4'b0001; // white pawn
+            board[55] <= 4'b0001; // white pawn
+
+            board[56] <= 4'b0100; // white rook
+            board[57] <= 4'b0010; // white knight
+            board[58] <= 4'b0011; // white bishop
+            board[59] <= 4'b0101; // white queen
+            board[60] <= 4'b0110; // white king
+            board[61] <= 4'b0011; // white bishop
+            board[62] <= 4'b0010; // white knight
+            board[63] <= 4'b0100; // white rook
+
+        end else if (wr_en) begin
+            board[wr_addr] <= wr_data; // write functionality
+        end
+    end
+
+endmodule
