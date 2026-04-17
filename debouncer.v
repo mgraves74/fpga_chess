@@ -1,9 +1,11 @@
-/* Button Debouncing State Machine file
+/* 
+
+Button Debouncing State Machine
 
 Marshall Graves & Sheel Shah -- FPGA Chess
-4/14/26
+Created: 4/14/26
 
-Based on ee354_debounce_DPB_SCEN_CCEN_MCEN_r1
+Adapted from ee354_debounce_DPB_SCEN_CCEN_MCEN_r1.v from ee354 GCD lab created 2/21/2010, Author Gandhi Puvvada
 
 */
 

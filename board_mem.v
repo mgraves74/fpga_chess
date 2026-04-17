@@ -1,7 +1,17 @@
-/* board memory file
+/* 
+
+Board Memory
 
 Marshall Graves & Sheel Shah --- FPGA Chess
-4/14/26
+Created: 4/14/26
+
+Original File
+
+*/
+
+/*
+
+Key Information:
 
 Chess Piece Encoding:
 4-bits: 0000
