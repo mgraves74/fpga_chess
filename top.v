@@ -34,7 +34,7 @@ module vga_top(
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0, // Switches 15-12 for promotion and 2-0 for reset
 
     // leds
-    output Ld15, Ld14, Ld13, Ld12, Ld11, Ld10, Ld9, Ld8, Ld7, Ld6, Ld5, Ld4, Ld3, Ld2, Ld1, Ld0, // LEDs TBD - for state display and maybe other things
+    output Ld2, Ld1, Ld0, // Ld2 for piece_selected flag, Ld1 and Ld0 to show current state
 	
 	);
 
@@ -51,7 +51,7 @@ module vga_top(
 	reg [4:0]  SSD;
 	wire [4:0] SSD7, SSD6, SSD5, SSD4, SSD3, SSD2, SSD1, SSD0;
 	reg [7:0]  SSD_CATHODES;
-	wire [2:0] ssdscan_clk;
+	wire [2:0] ssdscan_clk; 
 	
     // Clock division
 	reg [27:0]	DIV_CLK;
@@ -82,19 +82,22 @@ module vga_top(
     wire [5:0] wr_addr;
 	wire [3:0] wr_data;
 	wire wr_en;
-	wire [5:0] rd_addr;
-	wire [3:0] rd_data;
-	board_mem bm(.clk(ClkPort), .reset(Reset), .wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), .rd_addr(rd_addr), .rd_data(rd_data));
+	wire [5:0] rd_addr_renderer;
+	wire [3:0] rd_data_renderer;
+    wire [5:0] rd_addr_fsm;
+	wire [3:0] rd_data_fsm;
+	board_mem bm(.clk(ClkPort), .reset(Reset), .wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), .rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), .rd_addr_fsm(rd_addr_fsm), .rd_data_fsm(rd_data_fsm));
 
     // Game FSM
     wire [2:0] cursor_row, cursor_col;
 	wire [2:0] sel_row, sel_col;
 	wire piece_selected;
 	wire current_turn;
+    assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
 		.scen_c(scen_c), .mcen_u(mcen_u), .mcen_d(mcen_d), .mcen_l(mcen_l), .mcen_r(mcen_r),
-		.rd_data(rd_data),
+		.rd_data(rd_data_fsm),
 		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en),
 		.cursor_row(cursor_row), .cursor_col(cursor_col),
 		.sel_row(sel_row), .sel_col(sel_col),
@@ -103,14 +106,13 @@ module vga_top(
 	);
 
     // VGA Renderer
-	assign rd_addr = {cursor_row, cursor_col}; // renderer port list needs to be fixed; and other things too - so this is TBD
 	vga_renderer vr(
 		.bright(bright), .hCount(hc), .vCount(vc),
-		.rd_data(rd_data),
+		.rd_data_renderer(rd_data_renderer),
 		.cursor_row(cursor_row), .cursor_col(cursor_col),
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
-		.rgb(rgb)
+		.rgb(rgb), .rd_addr_renderer(rd_addr_renderer)
 	);
 
 	assign vgaR = rgb[11:8];
@@ -119,18 +121,26 @@ module vga_top(
 	
 	assign QuadSpiFlashCS = 1'b1;
 	
+    //------------------//
+    //     LED Code     //
+    //------------------//
+    
+    // LED inst
+    assign {Ld2, Ld1, Ld0} = piece_selected, state;
+
 	//------------------//
     //     SSD Code     //
     //------------------//
 
-    assign SSD7 = 4'b0000;
-	assign SSD6 = 4'b0000;
-	assign SSD5 = 4'b0000;
-	assign SSD4 = 4'b0000;
-	assign SSD3 = 4'b0000;
-	assign SSD2 = 4'b0000;
-	assign SSD1 = 4'b0000;
-	assign SSD0 = 4'b0000;
+    // Display either white's turn or black's turn on ssd. current_turn = 0 for white
+    assign SSD7 = current_turn ? 4'b0001 : 4'b1111; // B : W
+	assign SSD6 = current_turn ? 4'b1000 : 4'b0101; // L : H
+	assign SSD5 = current_turn ? 4'b0111 : 4'b1110; // K : T
+	assign SSD4 = 4'b0000; // blank
+	assign SSD3 = 4'b0000; // blank
+	assign SSD2 = 4'b0000; // blank
+	assign SSD1 = 4'b0100; // G
+	assign SSD0 = 4'b1010; // O
     
     /*
 	Scan clock for the SSD display - all 8 SSDs

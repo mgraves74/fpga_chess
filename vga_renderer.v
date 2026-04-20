@@ -42,11 +42,12 @@ Selected: 4-pixel green border drawn around square
 module vga_renderer(
     input bright,
     input [9:0] hCount, vCount,
-    input [3:0] rd_data,
+    input [3:0] rd_data_renderer,
     input [2:0] cursor_row, cursor_col,
     input [2:0] sel_row, sel_col,
     input piece_selected,
-    output reg [11:0] rgb
+    output reg [11:0] rgb,
+    output [5:0] rd_addr_renderer
     );
 
     parameter BLACK  = 12'b0000_0000_0000; // black color
@@ -94,9 +95,12 @@ module vga_renderer(
     wire is_cursor_sq   = (sq_row == cursor_row) && (sq_col == cursor_col);
     wire is_selected_sq = piece_selected && (sq_row == sel_row) && (sq_col == sel_col); // piece_selected flag must also be true so doesn't stay highlighted after turn ends
 
+    // calculate current pixel's board memory address so that board_memory module can provide data at that pixel
+    wire [5:0] rd_addr_renderer = sq_row * 8 + sq_col;
+
     // read board memory
-    wire [2:0] piece_type  = rd_data[2:0]; // piece type data is 3 LSB
-    wire piece_color = rd_data[3]; // piece color data is 1 MSB
+    wire [2:0] piece_type  = rd_data_renderer[2:0]; // piece type data is 3 LSB
+    wire piece_color = rd_data_renderer[3]; // piece color data is 1 MSB
 
     // mapping board memory encodings to colors
     reg [11:0] piece_rgb;

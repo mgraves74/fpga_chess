@@ -31,6 +31,22 @@ MSB: 0- white, 1- black
 0000 & 1000 are the same
 0111 & 1111 not used
 
+Read Data Flow:
+There are two sets of ports for read addr/data: one for the renderer and one for the fsm. The reason why there 
+are two is because fsm and renderer need to read different data from memory at the same time, which works fine
+because data reads are fully combinational.
+
+Renderer Read Data Flow:
+rd_addr_renderer is produced by the renderer module for every pixel it draws. When it draws a pixel it calculates 
+the board address where that pixel lies. That address connects via the top to the board memory where it does a 
+lookup to produce rd_data_renderer. rd_data renderer connects via the top back to the renderer where it used to 
+determine piece type and color for the board coloring.
+
+FSM Read Data Flow:
+rd_addr_fsm is always equal to the position of the cursor (as assigned in the top). The board memory module does 
+a lookup of this address to produce rd_data_fsm. rd_data_fsm connects via the top to the game_fsm where it is 
+used to store the moving piece and to prvent a selected square from being empty of the wrong color.
+
 */
 
 module board_mem (
@@ -39,13 +55,16 @@ module board_mem (
     input [5:0] wr_addr, // write address -- 2^6 == 64 addresses
     input [3:0] wr_data, // write data -- 4 bit piece encoding data
     input wr_en, // write enable
-    input [5:0] rd_addr, // read address
-    output [3:0] rd_data // read data
+    input [5:0] rd_addr_renderer, // read address for renderer
+    output [3:0] rd_data_renderer // read data for renderer
+    input [5:0] rd_addr_fsm, // read address for fsm
+    output [3:0] rd_data_fsm // read data for fsm
 );
 
     reg [3:0] board [0:63]; // board memory init
 
-    assign rd_data = board[rd_addr]; // read functionality
+    assign rd_data_renderer = board[rd_addr_renderer]; // read lookup functionality for the vga renderer
+    assign rd_data_fsm = board[rd_addr_fsm]; // read lookup functionality for the fsm
 
     // write and reset/init functionality
     integer i;

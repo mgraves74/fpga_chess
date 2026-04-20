@@ -8,7 +8,7 @@ module game_fsm (
     input mcen_d, // down button mcen pulse
     input mcen_l, // left button mcen pulse
     input mcen_r, // right button mcen pulse
-    input [3:0] rd_data, // read board memory
+    input [3:0] rd_data_fsm, // read board memory
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -17,15 +17,15 @@ module game_fsm (
     output reg [2:0] sel_row, // selected row (0-7)
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
-    output reg current_turn // current turn flag - 0 for white's move, 1 for black's move
-);
+    output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
+    output reg [1:0] state // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    );
 
     // states 
     localparam IDLE = 2'b00;
     localparam PIECE_SELECTED = 2'b01;
     localparam MOVING  = 2'b10;
-
-    reg [1:0] state; // 2 bit state encoding for 3 states
+     
     reg move_phase; // move phase flag for "moving" state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
 
@@ -65,10 +65,10 @@ module game_fsm (
                     if (mcen_r && cursor_col < 7) cursor_col <= cursor_col + 1; // right 
 
                     // IDLE --> Piece Selected: if select button and selected square not empty and correct color piece
-                    if (scen_c && rd_data[2:0] != 3'b000 && rd_data[3] == current_turn) begin
+                    if (scen_c && rd_data_fsm[2:0] != 3'b000 && rd_data_fsm[3] == current_turn) begin
                         sel_row <= cursor_row; // assign selected square
                         sel_col <= cursor_col;
-                        moving_piece <= rd_data; // register the moving piece's encoding from read data
+                        moving_piece <= rd_data_fsm; // register the moving piece's encoding from read data
                         piece_selected <= 1; // set flag (the only reason this exists is to color square on the display; no function in the fsm)
                         state <= PIECE_SELECTED;
                     end
