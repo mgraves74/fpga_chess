@@ -56,7 +56,7 @@ module board_mem (
     input [3:0] wr_data, // write data -- 4 bit piece encoding data
     input wr_en, // write enable
     input [5:0] rd_addr_renderer, // read address for renderer
-    output [3:0] rd_data_renderer // read data for renderer
+    output [3:0] rd_data_renderer, // read data for renderer
     input [5:0] rd_addr_fsm, // read address for fsm
     output [3:0] rd_data_fsm // read data for fsm
 );
