@@ -19,32 +19,41 @@ module vga_top(
 	input BtnR,
 	input BtnL,
 	input BtnD,
-	//VGA signal
+	
+    output  QuadSpiFlashCS
+
+    //VGA signal
 	output hSync, vSync,
 	output [3:0] vgaR, vgaG, vgaB,
 	
 	//SSG signal 
 	output An0, An1, An2, An3, An4, An5, An6, An7,
 	output Ca, Cb, Cc, Cd, Ce, Cf, Cg, Dp,
+
+    // switches
+    input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0, // Switches 15-12 for promotion and 2-0 for reset
+
+    // leds
+    output Ld15, Ld14, Ld13, Ld12, Ld11, Ld10, Ld9, Ld8, Ld7, Ld6, Ld5, Ld4, Ld3, Ld2, Ld1, Ld0, // LEDs TBD - for state display and maybe other things
 	
-	//output MemOE, MemWR, RamCS,
-	output  QuadSpiFlashCS
 	);
+
+    // reset
 	wire Reset;
-	assign Reset=BtnC;
+	assign Reset = Sw0 && Sw1 && Sw2;
+
+    // vga wire inst
 	wire bright;
-	wire[9:0] hc, vc;
-	wire[15:0] score; // remove
-	wire up,down,left,right;
-	wire [3:0] anode;
+	wire [9:0] hc, vc;
 	wire [11:0] rgb;
-	wire rst; // remove
+
+    // SSD inst
+	reg [4:0]  SSD;
+	wire [4:0] SSD7, SSD6, SSD5, SSD4, SSD3, SSD2, SSD1, SSD0;
+	reg [7:0]  SSD_CATHODES;
+	wire [2:0] ssdscan_clk;
 	
-	reg [3:0]	SSD;
-	wire [3:0]	SSD3, SSD2, SSD1, SSD0;
-	reg [7:0]  	SSD_CATHODES;
-	wire [1:0] 	ssdscan_clk;
-	
+    // Clock division
 	reg [27:0]	DIV_CLK;
 	always @ (posedge ClkPort, posedge Reset)  
 	begin : CLOCK_DIVIDER
@@ -54,114 +63,136 @@ module vga_top(
 			DIV_CLK <= DIV_CLK + 1'b1;
 	end
 
-    // remove following move_clk stuff
-	wire move_clk; // remove
-	assign move_clk=DIV_CLK[19]; //slower clock to drive the movement of objects on the vga screen
-	wire [11:0] background;
-	display_controller dc(.clk(ClkPort), .hSync(hSync), .vSync(vSync), .bright(bright), .hCount(hc), .vCount(vc));
-	// remove block_controller
-    block_controller sc(.clk(move_clk), .bright(bright), .rst(BtnC), .up(BtnU), .down(BtnD),.left(BtnL),.right(BtnR),.hCount(hc), .vCount(vc), .rgb(rgb), .background(background));
-	
+    //------------------//
+    //  Instantiations  //
+    //------------------//
 
+    // VGA controller
+	vga_controller dc(.clk(ClkPort), .hSync(hSync), .vSync(vSync), .bright(bright), .hCount(hc), .vCount(vc));
 
+    // Chess debouncers - 5, one for each button
+    wire scen_c, mcen_u, mcen_d, mcen_l, mcen_r;
+    chess_debouncer dbc(.CLK(ClkPort), .RESET(Reset), .PB(BtnC), .DPB(), .SCEN(scen_c), .MCEN(), .CCEN()); // center - SCEN only
+	chess_debouncer dbu(.CLK(ClkPort), .RESET(Reset), .PB(BtnU), .DPB(), .SCEN(),       .MCEN(mcen_u), .CCEN()); // Up - MCEN only
+	chess_debouncer dbr(.CLK(ClkPort), .RESET(Reset), .PB(BtnR), .DPB(), .SCEN(),       .MCEN(mcen_r), .CCEN()); // Right - MCEN only
+	chess_debouncer dbl(.CLK(ClkPort), .RESET(Reset), .PB(BtnL), .DPB(), .SCEN(),       .MCEN(mcen_l), .CCEN()); // Left - MCEN only
+	chess_debouncer dbd(.CLK(ClkPort), .RESET(Reset), .PB(BtnD), .DPB(), .SCEN(),       .MCEN(mcen_d), .CCEN()); // Down - MCEN only
+
+    // Board memory
+    wire [5:0] wr_addr;
+	wire [3:0] wr_data;
+	wire wr_en;
+	wire [5:0] rd_addr;
+	wire [3:0] rd_data;
+	board_mem bm(.clk(ClkPort), .reset(Reset), .wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), .rd_addr(rd_addr), .rd_data(rd_data));
+
+    // Game FSM
+    wire [2:0] cursor_row, cursor_col;
+	wire [2:0] sel_row, sel_col;
+	wire piece_selected;
+	wire current_turn;
+	game_fsm gf(
+		.clk(ClkPort), .reset(Reset),
+		.scen_c(scen_c), .mcen_u(mcen_u), .mcen_d(mcen_d), .mcen_l(mcen_l), .mcen_r(mcen_r),
+		.rd_data(rd_data),
+		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en),
+		.cursor_row(cursor_row), .cursor_col(cursor_col),
+		.sel_row(sel_row), .sel_col(sel_col),
+		.piece_selected(piece_selected),
+		.current_turn(current_turn)
+	);
+
+    // VGA Renderer
+	assign rd_addr = {cursor_row, cursor_col}; // renderer port list needs to be fixed; and other things too - so this is TBD
+	vga_renderer vr(
+		.bright(bright), .hCount(hc), .vCount(vc),
+		.rd_data(rd_data),
+		.cursor_row(cursor_row), .cursor_col(cursor_col),
+		.sel_row(sel_row), .sel_col(sel_col),
+		.piece_selected(piece_selected),
+		.rgb(rgb)
+	);
+
+	assign vgaR = rgb[11:8];
+	assign vgaG = rgb[7:4];
+	assign vgaB = rgb[3:0];
 	
-	assign vgaR = rgb[11 : 8];
-	assign vgaG = rgb[7  : 4];
-	assign vgaB = rgb[3  : 0];
-	
-	// disable mamory ports
-	//assign {MemOE, MemWR, RamCS, QuadSpiFlashCS} = 4'b1111;
 	assign QuadSpiFlashCS = 1'b1;
 	
-	//------------
-// SSD (Seven Segment Display)
-	// reg [3:0]	SSD;
-	// wire [3:0]	SSD3, SSD2, SSD1, SSD0;
-	
-	//SSDs display 
-	//to show how we can interface our "game" module with the SSD's, we output the 12-bit rgb background value to the SSD's
+	//------------------//
+    //     SSD Code     //
+    //------------------//
+
+    assign SSD7 = 4'b0000;
+	assign SSD6 = 4'b0000;
+	assign SSD5 = 4'b0000;
+	assign SSD4 = 4'b0000;
 	assign SSD3 = 4'b0000;
-	assign SSD2 = background[11:8];
-	assign SSD1 = background[7:4];
-	assign SSD0 = background[3:0];
+	assign SSD2 = 4'b0000;
+	assign SSD1 = 4'b0000;
+	assign SSD0 = 4'b0000;
+    
+    /*
+	Scan clock for the SSD display - all 8 SSDs
+	100 MHz / 2^17 = 762.9 cycles/sec ==> frequency of DIV_CLK[16]
+	100 MHz / 2^18 = 381.5 cycles/sec ==> frequency of DIV_CLK[17]
+	100 MHz / 2^19 = 190.7 cycles/sec ==> frequency of DIV_CLK[18]
+	762.9 cycles/sec (1.31 ms per digit) --- all 8 digits are lit once every 10.5 ms
+	*/
 
+	assign ssdscan_clk = DIV_CLK[18:16];
 
-	// need a scan clk for the seven segment display 
+    // Turn on anodes one by one at scan clock speed - fast clock makes it look like all are all on simultaneously
+	assign An0	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 000
+	assign An1	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 001
+	assign An2	=  !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 010
+	assign An3	=  !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 011
+    assign An4	= !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 100
+	assign An5	= !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 101
+	assign An6	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 110
+	assign An7	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 111
 	
-	// 100 MHz / 2^18 = 381.5 cycles/sec ==> frequency of DIV_CLK[17]
-	// 100 MHz / 2^19 = 190.7 cycles/sec ==> frequency of DIV_CLK[18]
-	// 100 MHz / 2^20 =  95.4 cycles/sec ==> frequency of DIV_CLK[19]
-	
-	// 381.5 cycles/sec (2.62 ms per digit) [which means all 4 digits are lit once every 10.5 ms (reciprocal of 95.4 cycles/sec)] works well.
-	
-	//                  --|  |--|  |--|  |--|  |--|  |--|  |--|  |--|  |   
-    //                    |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 
-	//  DIV_CLK[17]       |__|  |__|  |__|  |__|  |__|  |__|  |__|  |__|
-	//
-	//               -----|     |-----|     |-----|     |-----|     |
-    //                    |  0  |  1  |  0  |  1  |     |     |     |     
-	//  DIV_CLK[18]       |_____|     |_____|     |_____|     |_____|
-	//
-	//         -----------|           |-----------|           |
-    //                    |  0     0  |  1     1  |           |           
-	//  DIV_CLK[19]       |___________|           |___________|
-	//
-
-	assign ssdscan_clk = DIV_CLK[19:18];
-	assign An0	= !(~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 00
-	assign An1	= !(~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 01
-	assign An2	=  !((ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 10
-	assign An3	=  !((ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 11
-	// Turn off another 4 anodes
-	assign {An7, An6, An5, An4} = 4'b1111;
-	
-	always @ (ssdscan_clk, SSD0, SSD1, SSD2, SSD3)
+    // set full SSD equal (the 8 cathodes) to given SSD digit at the time in sync with when its anode is turned on (so that digit is displayed in the correct place)
+	always @ (ssdscan_clk, SSD0, SSD1, SSD2, SSD3, SSD4, SSD5, SSD6, SSD7)
 	begin : SSD_SCAN_OUT
 		case (ssdscan_clk) 
-				  2'b00: SSD = SSD0;
-				  2'b01: SSD = SSD1;
-				  2'b10: SSD = SSD2;
-				  2'b11: SSD = SSD3;
+            3'b000: SSD = SSD0;
+            3'b001: SSD = SSD1;
+            3'b010: SSD = SSD2;
+            3'b011: SSD = SSD3;
+            3'b100: SSD = SSD4;
+            3'b101: SSD = SSD5;
+            3'b110: SSD = SSD6;
+            3'b111: SSD = SSD7;
 		endcase 
 	end
 
-	// Following is Hex-to-SSD conversion
+	// Hex-to-SSD conversion
 	always @ (SSD) 
 	begin : HEX_TO_SSD
-		case (SSD) // in this solution file the dot points are made to glow by making Dp = 0
-		    //                                                                abcdefg,Dp
-			4'b0000: SSD_CATHODES = 8'b00000010; // 0
-			4'b0001: SSD_CATHODES = 8'b10011110; // 1
-			4'b0010: SSD_CATHODES = 8'b00100100; // 2
-			4'b0011: SSD_CATHODES = 8'b00001100; // 3
-			4'b0100: SSD_CATHODES = 8'b10011000; // 4
-			4'b0101: SSD_CATHODES = 8'b01001000; // 5
-			4'b0110: SSD_CATHODES = 8'b01000000; // 6
-			4'b0111: SSD_CATHODES = 8'b00011110; // 7
-			4'b1000: SSD_CATHODES = 8'b00000000; // 8
-			4'b1001: SSD_CATHODES = 8'b00001000; // 9
-			4'b1010: SSD_CATHODES = 8'b00010000; // A
-			4'b1011: SSD_CATHODES = 8'b11000000; // B
-			4'b1100: SSD_CATHODES = 8'b01100010; // C
-			4'b1101: SSD_CATHODES = 8'b10000100; // D
-			4'b1110: SSD_CATHODES = 8'b01100000; // E
-			4'b1111: SSD_CATHODES = 8'b01110000; // F    
-			default: SSD_CATHODES = 8'bXXXXXXXX; // default is not needed as we covered all cases
+		case (SSD)
+            // SSD letter encodings for letters ABCEGHIKLNOPRTW which are the 16 letters used in SSD messages
+			4'b0000: SSD_CATHODES = 8'b00010001; // A
+			4'b0001: SSD_CATHODES = 8'b00000111; // B
+			4'b0010: SSD_CATHODES = 8'b10001101; // C
+			4'b0011: SSD_CATHODES = 8'b00001101; // E
+			4'b0100: SSD_CATHODES = 8'b10000101; // G
+			4'b0101: SSD_CATHODES = 8'b00010011; // H
+			4'b0110: SSD_CATHODES = 8'b10011111; // I
+			4'b0111: SSD_CATHODES = 8'b00010101; // K
+			4'b1000: SSD_CATHODES = 8'b10001111; // L
+			4'b1001: SSD_CATHODES = 8'b10010001; // N
+			4'b1010: SSD_CATHODES = 8'b10000001; // O
+			4'b1011: SSD_CATHODES = 8'b00011001; // P
+			4'b1100: SSD_CATHODES = 8'b10011001; // R
+            4'b1101: SSD_CATHODES = 8'b00100101; // S
+			4'b1110: SSD_CATHODES = 8'b00001111; // T
+			4'b1111: SSD_CATHODES = 8'b10101011; // W
+			default: SSD_CATHODES = 8'b11111111; // default is all dark -- but all cases are covered anyway
 		endcase
 	end	
-	
-	// reg [7:0]  SSD_CATHODES;
+    
+    // set cathodes
 	assign {Ca, Cb, Cc, Cd, Ce, Cf, Cg, Dp} = {SSD_CATHODES};
 
 endmodule
-
-/*
-    TBD:
-
-    - Add sw[15:0] to port list, assign Reset = &sw[15:0] --- actually reset probably won't be all switches high
-    - Instantiate 5 chess_debouncers (one per button), MCEN --> FSM for cursor movement, SCEN only for BtnC for select
-    - Instantiate board_mem, wire write port to game_fsm, read port to vga_renderer
-    - Instantiate game_fsm, debounced pulses --> fsm, wire cursor outputs to renderer, do whatever I decide the annunciations to the SSDs and LEDs
-    - Instantiate vga_renderer, hCount/vCount/bright --> renderer, rd_data --> renderer, rgb stuff to replace stuff here
-    - Add led[15:0] to port list -- figure out what to do with that
-*/

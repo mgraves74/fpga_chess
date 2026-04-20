@@ -3,10 +3,12 @@
 ### Created: 4/14/26
 ### Adapted from A7 xdc file for moving block VGA demo A7_nexys7.xdc, Author Sharath Krishnan
 
+### ClkPort
 set_property PACKAGE_PIN E3 [get_ports ClkPort]							
 	set_property IOSTANDARD LVCMOS33 [get_ports ClkPort]
 	create_clock -add -name ClkPort -period 10.00 [get_ports ClkPort]
 
+### SSD CATHODES
 set_property PACKAGE_PIN T10 [get_ports {Ca}] 
 	set_property IOSTANDARD LVCMOS33 [get_ports {Ca}]
 
@@ -31,6 +33,7 @@ set_property PACKAGE_PIN L18 [get_ports {Cg}]
 set_property PACKAGE_PIN H15 [get_ports Dp] 
 	set_property IOSTANDARD LVCMOS33 [get_ports Dp]
 
+### SSD ANODES
 set_property PACKAGE_PIN J17 [get_ports {An0}] 
 	set_property IOSTANDARD LVCMOS33 [get_ports {An0}]
 
@@ -55,6 +58,7 @@ set_property PACKAGE_PIN K2 [get_ports {An6}]
 set_property PACKAGE_PIN U13 [get_ports {An7}] 
 	set_property IOSTANDARD LVCMOS33 [get_ports {An7}]
 
+### PUSH BUTTONS
 set_property PACKAGE_PIN N17 [get_ports BtnC] 
 	set_property IOSTANDARD LVCMOS33 [get_ports BtnC]
 
@@ -70,6 +74,7 @@ set_property PACKAGE_PIN M17 [get_ports BtnR]
 set_property PACKAGE_PIN P18 [get_ports BtnD] 
 	set_property IOSTANDARD LVCMOS33 [get_ports BtnD]
 
+### VGA
 set_property PACKAGE_PIN A3 [get_ports {vgaR[0]}]				
 	set_property IOSTANDARD LVCMOS33 [get_ports {vgaR[0]}]
 
@@ -112,7 +117,65 @@ set_property PACKAGE_PIN B11 [get_ports hSync]
 set_property PACKAGE_PIN B12 [get_ports vSync]						
 	set_property IOSTANDARD LVCMOS33 [get_ports vSync]
 
+### QuadSpiFlashCS
 set_property PACKAGE_PIN L13 [get_ports QuadSpiFlashCS]					
 	set_property IOSTANDARD LVCMOS33 [get_ports QuadSpiFlashCS]
 
-### TBD add switches and LEDs
+### SWITCHES
+set_property PACKAGE_PIN J15 [get_ports {Sw0}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw0}]
+
+set_property PACKAGE_PIN L16 [get_ports {Sw1}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw1}]
+
+set_property PACKAGE_PIN M13 [get_ports {Sw2}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw2}]
+
+### LEDS
+set_property PACKAGE_PIN H17 [get_ports {Ld0}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld0}]
+
+set_property PACKAGE_PIN K15 [get_ports {Ld1}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld1}]
+
+set_property PACKAGE_PIN J13 [get_ports {Ld2}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld2}]
+
+set_property PACKAGE_PIN N14 [get_ports {Ld3}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld3}]
+
+set_property PACKAGE_PIN R18 [get_ports {Ld4}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld4}]
+
+set_property PACKAGE_PIN V17 [get_ports {Ld5}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld5}]
+
+set_property PACKAGE_PIN U17 [get_ports {Ld6}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld6}]
+
+set_property PACKAGE_PIN U16 [get_ports {Ld7}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld7}]
+
+set_property PACKAGE_PIN V16 [get_ports {Ld8}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld8}]
+
+set_property PACKAGE_PIN T15 [get_ports {Ld9}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld9}]
+
+set_property PACKAGE_PIN U14 [get_ports {Ld10}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld10}]
+
+set_property PACKAGE_PIN T16 [get_ports {Ld11}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld11}]
+
+set_property PACKAGE_PIN V15 [get_ports {Ld12}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld12}]
+
+set_property PACKAGE_PIN V14 [get_ports {Ld13}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld13}]
+
+set_property PACKAGE_PIN V12 [get_ports {Ld14}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld14}]
+
+set_property PACKAGE_PIN V11 [get_ports {Ld15}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Ld15}]

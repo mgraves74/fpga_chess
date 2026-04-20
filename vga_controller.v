@@ -11,7 +11,7 @@ From display_controller.v -- VGA moving block demo -- ee354 created 11:27:11 12/
 
 `timescale 1ns / 1ps
 
-module display_controller(
+module vga_controller(
 	input clk,
 	output hSync, vSync,
 	output reg bright,
