@@ -92,7 +92,7 @@ module vga_renderer(
 
     // for highlighting of cursor and selected squares
     wire is_cursor_sq   = (sq_row == cursor_row) && (sq_col == cursor_col);
-    wire is_selected_sq = piece_selected && (sq_row == sel_row) && (sq_col == sel_col); // piece_selected flag must also be true
+    wire is_selected_sq = piece_selected && (sq_row == sel_row) && (sq_col == sel_col); // piece_selected flag must also be true so doesn't stay highlighted after turn ends
 
     // read board memory
     wire [2:0] piece_type  = rd_data[2:0]; // piece type data is 3 LSB
