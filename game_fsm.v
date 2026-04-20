@@ -1,3 +1,14 @@
+/* 
+
+Game FSM
+
+Marshall Graves & Sheel Shah --- FPGA Chess
+Created: 4/14/26
+
+Original File
+
+*/
+
 `timescale 1ns / 1ps
 
 module game_fsm (

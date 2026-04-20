@@ -5,8 +5,7 @@ Top File
 Marshall Graves & Sheel Shah -- FPGA Chess
 Created: 4/14/26
 
-Adapted from A7 VGA Moving Block Demo top file vga_top.v -- ee354 created 12:18:00 12/14/2017, Author Yue (Julien) Niu 
-- Core SSD clock divider, button, and VGA instantiation logic from original file, SSD logic inspired by original file, game-specific annunciator logic and instantiations are novel
+Original file; loosely inspired by vga_top.v -- ee354 created 12:18:00 12/14/2017 by Yue (Julien) Niu 
 
 */
 

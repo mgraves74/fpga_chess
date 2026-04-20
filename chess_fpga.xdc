@@ -1,7 +1,7 @@
 ### A7 xdc file
 ### Marshall Graves & Sheel Shah -- FPGA Chess
 ### Created: 4/14/26
-### Adapted from A7 xdc file for moving block VGA demo A7_nexys7.xdc, Author Sharath Krishnan
+### Adapted from A7 xdc file for moving block VGA demo A7_nexys7.xdc by Sharath Krishnan
 
 ### ClkPort
 set_property PACKAGE_PIN E3 [get_ports ClkPort]							

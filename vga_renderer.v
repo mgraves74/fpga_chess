@@ -5,7 +5,7 @@ VGA Renderer
 Marshall Graves & Sheel Shah
 Created: 4/14/26
 
-Original file; loosely ispired by block_controller.v from VGA moving block demo -- ee354
+Original file; loosely inspired by block_controller.v from VGA moving block demo -- ee354
 
 */
 
