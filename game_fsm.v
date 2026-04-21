@@ -119,7 +119,7 @@ module game_fsm (
                     end else begin
                         wr_en <= 1;
                         wr_addr <= sel_addr; // write to original selected address
-                        wr_data <= 4'b0000; // clear to empty square
+                        wr_data <= 4'b0000; // clear to empty square - always 0000, never 1000
                         move_phase <= 0; // clear flags
                         piece_selected <= 0;
                         current_turn <= ~current_turn; // flip bit for opposite player's turn

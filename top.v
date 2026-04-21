@@ -66,6 +66,8 @@ module vga_top(
     //  Instantiations  //
     //------------------//
 
+	assign QuadSpiFlashCS = 1'b1;
+
     // VGA controller
 	vga_controller dc(.clk(ClkPort), .hSync(hSync), .vSync(vSync), .bright(bright), .hCount(hc), .vCount(vc));
 
@@ -118,8 +120,20 @@ module vga_top(
 	assign vgaR = rgb[11:8];
 	assign vgaG = rgb[7:4];
 	assign vgaB = rgb[3:0];
-	
-	assign QuadSpiFlashCS = 1'b1;
+
+	// Move validator ---- TBD-ish
+
+	wire valid;
+	wire [5:0] mv_src = {sel_row, sel_col}; // source (latched selected column and row)
+	wire [5:0] mv_dst = {cursor_row, cursor_col}; // destination (current cursor and row)
+
+	move_validator mv(
+		.board(board_out),
+		.src(mv_src),
+		.dst(mv_dst),
+		.current_turn(current_turn),
+		.valid(valid)
+	);
 	
     //------------------//
     //     LED Code     //

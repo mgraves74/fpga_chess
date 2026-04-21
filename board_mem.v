@@ -19,7 +19,7 @@ Chess Piece Encoding:
 MSB: 0- white, 1- black
 
 3 LSB - piece encodings:
-000- empty
+000- empty (0000 only, not 1000)
 001- pawn
 010- knight
 011- bishop
@@ -28,8 +28,7 @@ MSB: 0- white, 1- black
 110- king
 111- not used
 
-0000 & 1000 are the same
-0111 & 1111 not used
+1000, 0111 & 1111 not used
 
 Read Data Flow:
 There are two sets of ports for read addr/data: one for the renderer and one for the fsm. The reason why there 
