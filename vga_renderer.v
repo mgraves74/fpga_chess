@@ -96,7 +96,7 @@ module vga_renderer(
     wire is_selected_sq = piece_selected && (sq_row == sel_row) && (sq_col == sel_col); // piece_selected flag must also be true so doesn't stay highlighted after turn ends
 
     // calculate current pixel's board memory address so that board_memory module can provide data at that pixel
-    wire [5:0] rd_addr_renderer = sq_row * 8 + sq_col;
+    assign rd_addr_renderer = sq_row * 8 + sq_col;
 
     // read board memory
     wire [2:0] piece_type  = rd_data_renderer[2:0]; // piece type data is 3 LSB

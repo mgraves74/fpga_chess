@@ -19,7 +19,7 @@ module vga_top(
 	input BtnL,
 	input BtnD,
 	
-    output  QuadSpiFlashCS
+    output  QuadSpiFlashCS,
 
     //VGA signal
 	output hSync, vSync,
@@ -33,7 +33,7 @@ module vga_top(
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0, // Switches 15-12 for promotion and 2-0 for reset
 
     // leds
-    output Ld2, Ld1, Ld0, // Ld2 for piece_selected flag, Ld1 and Ld0 to show current state
+    output Ld2, Ld1, Ld0 // Ld2 for piece_selected flag, Ld1 and Ld0 to show current state
 	
 	);
 
@@ -96,12 +96,13 @@ module vga_top(
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
 		.scen_c(scen_c), .mcen_u(mcen_u), .mcen_d(mcen_d), .mcen_l(mcen_l), .mcen_r(mcen_r),
-		.rd_data(rd_data_fsm),
+		.rd_data_fsm(rd_data_fsm),
 		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en),
 		.cursor_row(cursor_row), .cursor_col(cursor_col),
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
-		.current_turn(current_turn)
+		.current_turn(current_turn),
+		.state(state)
 	);
 
     // VGA Renderer
@@ -125,7 +126,8 @@ module vga_top(
     //------------------//
     
     // LED inst
-    assign {Ld2, Ld1, Ld0} = piece_selected, state;
+	wire [1:0] state;
+    assign {Ld2, Ld1, Ld0} = {piece_selected, state};
 
 	//------------------//
     //     SSD Code     //
