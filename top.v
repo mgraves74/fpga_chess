@@ -33,7 +33,7 @@ module vga_top(
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0, // Switches 15-12 for promotion and 2-0 for reset
 
     // leds
-    output Ld2, Ld1, Ld0 // Ld2 for piece_selected flag, Ld1 and Ld0 to show current state
+    output Ld3, Ld2, Ld1, Ld0 // Ld3 for piece_selected flag, Ld2 - Ld0 to show state- Ld2 is MOVING, Ld1 is PIECE_SELECTED, LD0 is IDLE
 	
 	);
 
@@ -92,6 +92,7 @@ module vga_top(
 	wire [2:0] sel_row, sel_col;
 	wire piece_selected;
 	wire current_turn;
+	wire [1:0] state;
     assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
@@ -126,8 +127,10 @@ module vga_top(
     //------------------//
     
     // LED inst
-	wire [1:0] state;
-    assign {Ld2, Ld1, Ld0} = {piece_selected, state};
+	assign Ld3 = piece_selected;
+	assign Ld2 = (state == 2'b10) ? 1'b1 : 1'b0;
+	assign Ld1 = (state == 2'b01) ? 1'b1 : 1'b0;
+	assign Ld0 = (state == 2'b00) ? 1'b1 : 1'b0;
 
 	//------------------//
     //     SSD Code     //
@@ -137,9 +140,9 @@ module vga_top(
     assign SSD7 = current_turn ? 4'b0001 : 4'b1111; // B : W
 	assign SSD6 = current_turn ? 4'b1000 : 4'b0101; // L : H
 	assign SSD5 = current_turn ? 4'b0111 : 4'b1110; // K : T
-	assign SSD4 = 4'b0000; // blank
-	assign SSD3 = 4'b0000; // blank
-	assign SSD2 = 4'b0000; // blank
+	assign SSD4 = 4'b0000; // blank (set to A but anode is diabled)
+	assign SSD3 = 4'b0000; // blank (set to A but anode is diabled)
+	assign SSD2 = 4'b0000; // blank (set to A but anode is diabled)
 	assign SSD1 = 4'b0100; // G
 	assign SSD0 = 4'b1010; // O
     
@@ -156,9 +159,9 @@ module vga_top(
     // Turn on anodes one by one at scan clock speed - fast clock makes it look like all are all on simultaneously
 	assign An0	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 000
 	assign An1	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 001
-	assign An2	=  !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 010
-	assign An3	=  !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 011
-    assign An4	= !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 100
+	assign An2	= 1'b1; // always off
+	assign An3	= 1'b1; // always off
+    assign An4	= 1'b1; // always off
 	assign An5	= !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 101
 	assign An6	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 110
 	assign An7	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 111
@@ -184,20 +187,20 @@ module vga_top(
 		case (SSD)
             // SSD letter encodings for letters ABCEGHIKLNOPRTW which are the 16 letters used in SSD messages
 			4'b0000: SSD_CATHODES = 8'b00010001; // A
-			4'b0001: SSD_CATHODES = 8'b00000111; // B
-			4'b0010: SSD_CATHODES = 8'b10001101; // C
-			4'b0011: SSD_CATHODES = 8'b00001101; // E
-			4'b0100: SSD_CATHODES = 8'b10000101; // G
-			4'b0101: SSD_CATHODES = 8'b00010011; // H
-			4'b0110: SSD_CATHODES = 8'b10011111; // I
-			4'b0111: SSD_CATHODES = 8'b00010101; // K
-			4'b1000: SSD_CATHODES = 8'b10001111; // L
-			4'b1001: SSD_CATHODES = 8'b10010001; // N
-			4'b1010: SSD_CATHODES = 8'b10000001; // O
-			4'b1011: SSD_CATHODES = 8'b00011001; // P
-			4'b1100: SSD_CATHODES = 8'b10011001; // R
-            4'b1101: SSD_CATHODES = 8'b00100101; // S
-			4'b1110: SSD_CATHODES = 8'b00001111; // T
+			4'b0001: SSD_CATHODES = 8'b11000001; // B
+			4'b0010: SSD_CATHODES = 8'b01100011; // C
+			4'b0011: SSD_CATHODES = 8'b01100001; // E
+			4'b0100: SSD_CATHODES = 8'b01000011; // G
+			4'b0101: SSD_CATHODES = 8'b10010001; // H
+			4'b0110: SSD_CATHODES = 8'b11110011; // I
+			4'b0111: SSD_CATHODES = 8'b01010001; // K
+			4'b1000: SSD_CATHODES = 8'b11100011; // L
+			4'b1001: SSD_CATHODES = 8'b00010011; // N
+			4'b1010: SSD_CATHODES = 8'b00000011; // O
+			4'b1011: SSD_CATHODES = 8'b00110001; // P
+			4'b1100: SSD_CATHODES = 8'b00110011; // R
+			4'b1101: SSD_CATHODES = 8'b01001001; // S
+			4'b1110: SSD_CATHODES = 8'b11100001; // T
 			4'b1111: SSD_CATHODES = 8'b10101011; // W
 			default: SSD_CATHODES = 8'b11111111; // default is all dark -- but all cases are covered anyway
 		endcase
