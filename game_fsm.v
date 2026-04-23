@@ -20,6 +20,7 @@ module game_fsm (
     input mcen_l, // left button mcen pulse
     input mcen_r, // right button mcen pulse
     input [3:0] rd_data_fsm, // read board memory
+    input valid,
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -30,12 +31,13 @@ module game_fsm (
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
     output reg [1:0] state // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg error_flash // flag to indicate that an error has been produced from an invalidated move
     );
 
     // states 
     localparam IDLE = 2'b00;
     localparam PIECE_SELECTED = 2'b01;
-    localparam MOVING  = 2'b10;
+    localparam MOVING = 2'b10;
      
     reg move_phase; // move phase flag for "moving" state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
@@ -99,11 +101,17 @@ module game_fsm (
                         if (cursor_row == sel_row && cursor_col == sel_col) begin
                             piece_selected <= 0;
                             state <= IDLE;
-
-                        // PIECE_SELECTED --> MOVING: if any other square (move validation TBD)
-                        end else begin
+                        end 
+                        
+                        // PIECE_SELECTED --> MOVING: if other square & if move valid
+                        else if (valid)
                             state <= MOVING;
-                        end
+
+                        // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
+
+                        // if not valid set error flash flag
+                        else if (!valid)
+                            error_flash = 1;
                     end
                 end
 

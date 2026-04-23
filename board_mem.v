@@ -30,6 +30,12 @@ MSB: 0- white, 1- black
 
 1000, 0111 & 1111 not used
 
+Board Square Order Note:
+In chess rows are called ranks and columns are called files. The first rank is where the white pieces are and
+the 8th rank is where the black pieces are. Here it is reversed. We stick with the terminology "rows" and columns
+and it is zero-indexed; however it starts with black pieces- the 0th row is the black pieces and 7th is white.
+Numbers go left to right and down from the black rook on the upper left.
+
 Read Data Flow:
 There are two sets of ports for read addr/data: one for the renderer and one for the fsm. The reason why there 
 are two is because fsm and renderer need to read different data from memory at the same time, which works fine

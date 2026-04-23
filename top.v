@@ -121,7 +121,7 @@ module vga_top(
 	assign vgaG = rgb[7:4];
 	assign vgaB = rgb[3:0];
 
-	// Move validator ---- TBD-ish
+	// Move validator
 
 	wire valid;
 	wire [5:0] mv_src = {sel_row, sel_col}; // source (latched selected column and row)
@@ -131,7 +131,6 @@ module vga_top(
 		.board(board_out),
 		.src(mv_src),
 		.dst(mv_dst),
-		.current_turn(current_turn),
 		.valid(valid)
 	);
 	
