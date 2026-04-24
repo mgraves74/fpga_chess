@@ -20,6 +20,7 @@ module game_fsm (
     input mcen_l, // left button mcen pulse
     input mcen_r, // right button mcen pulse
     input [3:0] rd_data_fsm, // read board memory
+    input valid,
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -29,13 +30,14 @@ module game_fsm (
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
-    output reg [1:0] state // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg [1:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg error_flag // flag to indicate that an error has been produced from an invalidated move
     );
 
     // states 
     localparam IDLE = 2'b00;
     localparam PIECE_SELECTED = 2'b01;
-    localparam MOVING  = 2'b10;
+    localparam MOVING = 2'b10;
      
     reg move_phase; // move phase flag for "moving" state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
@@ -64,6 +66,7 @@ module game_fsm (
         else begin
 
             wr_en <= 0; // always disable write at start
+            error_flag <= 0; // always clear error flag
 
             case (state)
 
@@ -99,11 +102,17 @@ module game_fsm (
                         if (cursor_row == sel_row && cursor_col == sel_col) begin
                             piece_selected <= 0;
                             state <= IDLE;
-
-                        // PIECE_SELECTED --> MOVING: if any other square (move validation TBD)
-                        end else begin
+                        end 
+                        
+                        // PIECE_SELECTED --> MOVING: if other square & if move valid
+                        else if (valid)
                             state <= MOVING;
-                        end
+
+                        // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
+
+                        // if not valid set error flash flag
+                        else if (!valid)
+                            error_flag <= 1;
                     end
                 end
 
@@ -119,7 +128,7 @@ module game_fsm (
                     end else begin
                         wr_en <= 1;
                         wr_addr <= sel_addr; // write to original selected address
-                        wr_data <= 4'b0000; // clear to empty square
+                        wr_data <= 4'b0000; // clear to empty square - always 0000, never 1000
                         move_phase <= 0; // clear flags
                         piece_selected <= 0;
                         current_turn <= ~current_turn; // flip bit for opposite player's turn

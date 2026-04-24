@@ -66,6 +66,8 @@ module vga_top(
     //  Instantiations  //
     //------------------//
 
+	assign QuadSpiFlashCS = 1'b1;
+
     // VGA controller
 	vga_controller dc(.clk(ClkPort), .hSync(hSync), .vSync(vSync), .bright(bright), .hCount(hc), .vCount(vc));
 
@@ -85,7 +87,12 @@ module vga_top(
 	wire [3:0] rd_data_renderer;
     wire [5:0] rd_addr_fsm;
 	wire [3:0] rd_data_fsm;
-	board_mem bm(.clk(ClkPort), .reset(Reset), .wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), .rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), .rd_addr_fsm(rd_addr_fsm), .rd_data_fsm(rd_data_fsm));
+	wire [255:0] board_flat_out;
+	board_mem bm(.clk(ClkPort), .reset(Reset), 
+		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), 
+		.rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), 
+		.rd_addr_fsm(rd_addr_fsm), .rd_data_fsm(rd_data_fsm),
+		.board_flat_out(board_flat_out));
 
     // Game FSM
     wire [2:0] cursor_row, cursor_col;
@@ -93,6 +100,7 @@ module vga_top(
 	wire piece_selected;
 	wire current_turn;
 	wire [1:0] state;
+	wire error_flag; 
     assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
@@ -103,24 +111,39 @@ module vga_top(
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
 		.current_turn(current_turn),
-		.state(state)
+		.state(state),
+		.error_flag(error_flag),
+		.valid(valid)
 	);
 
     // VGA Renderer
 	vga_renderer vr(
+		.clk(ClkPort),
 		.bright(bright), .hCount(hc), .vCount(vc),
-		.rd_data_renderer(rd_data_renderer),
+		.rd_data_renderer(rd_data_renderer), .rd_addr_renderer(rd_addr_renderer),
 		.cursor_row(cursor_row), .cursor_col(cursor_col),
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
-		.rgb(rgb), .rd_addr_renderer(rd_addr_renderer)
+		.rgb(rgb),
+		.error_flag(error_flag)
 	);
 
 	assign vgaR = rgb[11:8];
 	assign vgaG = rgb[7:4];
 	assign vgaB = rgb[3:0];
-	
-	assign QuadSpiFlashCS = 1'b1;
+
+	// Move validator
+
+	wire valid;
+	wire [5:0] mv_src = {sel_row, sel_col}; // source (latched selected column and row)
+	wire [5:0] mv_dst = {cursor_row, cursor_col}; // destination (current cursor and row)
+
+	move_validator mv(
+		.board_flat(board_flat_out),
+		.src(mv_src),
+		.dst(mv_dst),
+		.valid(valid)
+	);
 	
     //------------------//
     //     LED Code     //
@@ -136,15 +159,37 @@ module vga_top(
     //     SSD Code     //
     //------------------//
 
-    // Display either white's turn or black's turn on ssd. current_turn = 0 for white
-    assign SSD7 = current_turn ? 4'b0001 : 4'b1111; // B : W
-	assign SSD6 = current_turn ? 4'b1000 : 4'b0101; // L : H
-	assign SSD5 = current_turn ? 4'b0111 : 4'b1110; // K : T
-	assign SSD4 = 4'b0000; // blank (set to A but anode is diabled)
-	assign SSD3 = 4'b0000; // blank (set to A but anode is diabled)
-	assign SSD2 = 4'b0000; // blank (set to A but anode is diabled)
-	assign SSD1 = 4'b0100; // G
-	assign SSD0 = 4'b1010; // O
+	/*
+	
+	SSD Display Messages:
+
+	WHT___GO - when !current_turn (white's turn)
+	BLK___GO - when current_turn (black's turn)
+	ILLEGAL_ - if error_flash_ssd (a 2-sec display everytime a move is invalidated)
+
+	*/
+
+	// Error display timer
+	reg [27:0] ssd_error_timer; // 2^28 / 100000000 = 2.684 sec
+
+	always @(posedge ClkPort) begin
+		if (error_flag)
+			ssd_error_timer <= 28'd0;
+		else if (ssd_error_timer < 28'd200000000) // times exactly 2 + 1/10^8 sec
+			ssd_error_timer <= ssd_error_timer + 1;
+	end
+
+	wire error_flash_ssd = (ssd_error_timer < 28'd200000000);
+
+    // Display messages with priority to move error
+    assign SSD7 = error_flash_ssd ? 4'b0110: (current_turn ? 4'b0001 : 4'b1111); // I : (B : W)
+	assign SSD6 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b1000 : 4'b0101); // L : (L : H)
+	assign SSD5 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b0111 : 4'b1110); // L : (K : T)
+	assign SSD4 = 4'b0011; // E -- blank if !error_flash_ssd
+	assign SSD3 = 4'b0100; // G -- blank if !error_flash_ssd
+	assign SSD2 = 4'b0000; // A -- blank if !error_flash_ssd
+	assign SSD1 = error_flash_ssd ? 4'b1000: 4'b0100; // L : G
+	assign SSD0 = 4'b1010; // O -- blank if error_flash_ssd
     
     /*
 	Scan clock for the SSD display - all 8 SSDs
@@ -157,14 +202,14 @@ module vga_top(
 	assign ssdscan_clk = DIV_CLK[18:16];
 
     // Turn on anodes one by one at scan clock speed - fast clock makes it look like all are all on simultaneously
-	assign An0	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 000
-	assign An1	= !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 001
-	assign An2	= 1'b1; // always off
-	assign An3	= 1'b1; // always off
-    assign An4	= 1'b1; // always off
-	assign An5	= !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 101
-	assign An6	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0]));  // when ssdscan_clk = 110
-	assign An7	=  !((ssdscan_clk[2]) && (ssdscan_clk[1]) &&  (ssdscan_clk[0]));  // when ssdscan_clk = 111
+	assign An7 = !((ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 111
+	assign An6 = !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 110
+	assign An5 = !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 101
+	assign An4 = error_flash_ssd ? !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 100 -- on if error_flash_ssd
+	assign An3 = error_flash_ssd ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 011 -- on if error_flash_ssd
+    assign An2 = error_flash_ssd ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 010 -- on if error_flash_ssd
+	assign An1 = !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 001
+	assign An0 = error_flash_ssd ? 1'b1 : !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 000 -- off if error_flash_ssd
 	
     // set full SSD equal (the 8 cathodes) to given SSD digit at the time in sync with when its anode is turned on (so that digit is displayed in the correct place)
 	always @ (ssdscan_clk, SSD0, SSD1, SSD2, SSD3, SSD4, SSD5, SSD6, SSD7)

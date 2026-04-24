@@ -40,26 +40,29 @@ Selected: 4-pixel green border drawn around square
 `timescale 1ns / 1ps
 
 module vga_renderer(
+    input clk,
     input bright,
     input [9:0] hCount, vCount,
     input [3:0] rd_data_renderer,
     input [2:0] cursor_row, cursor_col,
     input [2:0] sel_row, sel_col,
     input piece_selected,
+    input error_flag,
     output reg [11:0] rgb,
     output [5:0] rd_addr_renderer
     );
 
-    parameter BLACK  = 12'b0000_0000_0000; // black color
-    parameter WHITE  = 12'b1111_1111_1111; // white color
+    parameter BLACK = 12'b0000_0000_0000; // black color
+    parameter WHITE = 12'b1111_1111_1111; // white color
 
     parameter LIGHT_SQ = 12'hEDD; // light square color
     parameter DARK_SQ  = 12'h842; // dark square color
 
-    parameter CURSOR_COLOR   = 12'hFF0; // cursor color
+    parameter CURSOR_COLOR = 12'hFF0; // cursor color
     parameter SELECTED_COLOR = 12'h0F0; // selected square color
+    parameter ERROR_COLOR = 12'hF00; // red error color
 
-    // Currently the pieces are represente4d by colors not sprites -- see color mapping in Key Information
+    // Currently the pieces are represented by colors not sprites -- see color mapping in Key Information
     parameter PAWN_W   = 12'hFFF;
     parameter KNIGHT_W = 12'h0F0;
     parameter BISHOP_W = 12'hFF0;
@@ -95,6 +98,22 @@ module vga_renderer(
     wire is_cursor_sq   = (sq_row == cursor_row) && (sq_col == cursor_col);
     wire is_selected_sq = piece_selected && (sq_row == sel_row) && (sq_col == sel_col); // piece_selected flag must also be true so doesn't stay highlighted after turn ends
 
+    // error flash highlighting
+    reg [24:0] vga_error_timer; // 2^25 / 100 MHz = ~0.3355 sec
+    reg [2:0] dst_row_error; // destination row and column, but different from dst in move_validator because this is latched at a specific time specifically for the error functionality
+    reg [2:0] dst_col_error;
+    always @(posedge clk) begin
+        if (error_flag) begin
+            vga_error_timer <= 25'd0; // times exactly 0.2 + 1/10^8 sec
+            dst_row_error <= cursor_row; // latch row and column at the start of the timer so that it doesn't change with any subsequent cursor move
+            dst_col_error <= cursor_col;
+        end else if (vga_error_timer < 25'd20000000)
+                vga_error_timer <= vga_error_timer + 1;
+    end
+
+    wire error_flash_vga = (vga_error_timer < 25'd20000000);
+    wire is_error_sq = (sq_row == dst_row_error) && (sq_col == dst_col_error); // error square if on the latched destination - remains even after timer finishes, but does not thing if error_flash_vga is 0
+
     // calculate current pixel's board memory address so that board_memory module can provide data at that pixel
     assign rd_addr_renderer = sq_row * 8 + sq_col;
 
@@ -128,6 +147,8 @@ module vga_renderer(
             rgb = BLACK;
         else if (on_border && is_selected_sq)
             rgb = SELECTED_COLOR;
+        else if (on_border && is_error_sq && error_flash_vga)
+            rgb = ERROR_COLOR;
         else if (on_border && is_cursor_sq)
             rgb = CURSOR_COLOR;
         else if (piece_type != 3'b000)

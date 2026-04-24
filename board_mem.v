@@ -19,7 +19,7 @@ Chess Piece Encoding:
 MSB: 0- white, 1- black
 
 3 LSB - piece encodings:
-000- empty
+000- empty (0000 only, not 1000)
 001- pawn
 010- knight
 011- bishop
@@ -28,8 +28,13 @@ MSB: 0- white, 1- black
 110- king
 111- not used
 
-0000 & 1000 are the same
-0111 & 1111 not used
+1000, 0111 & 1111 not used
+
+Board Square Order Note:
+In chess rows are called ranks and columns are called files. The first rank is where the white pieces are and
+the 8th rank is where the black pieces are. Here it is reversed. We stick with the terminology "rows" and columns
+and it is zero-indexed; however it starts with black pieces- the 0th row is the black pieces and 7th is white.
+Numbers go left to right and down from the black rook on the upper left.
 
 Read Data Flow:
 There are two sets of ports for read addr/data: one for the renderer and one for the fsm. The reason why there 
@@ -58,10 +63,19 @@ module board_mem (
     input [5:0] rd_addr_renderer, // read address for renderer
     output [3:0] rd_data_renderer, // read data for renderer
     input [5:0] rd_addr_fsm, // read address for fsm
-    output [3:0] rd_data_fsm // read data for fsm
+    output [3:0] rd_data_fsm, // read data for fsm
+    output [255:0] board_flat_out // board_out for move_validator which needs full board -- unfortunately verilog needs it to be flattened
 );
 
     reg [3:0] board [0:63]; // board memory init
+
+    // creating board_out which needs to be flattened - uses a generate-specific loop which is an elaboration time-only (when compiler is)
+    // building the circuit) -- each 4-bit encoding is unpacked from its square and listed in groups consequetively
+    genvar g; // generate loop
+    generate
+        for (g = 0; g < 64; g = g + 1) // just a simple loop to flatten board from essentially a 2d array to 1d
+            assign board_flat_out[g*4 +: 4] = board[g];
+    endgenerate
 
     assign rd_data_renderer = board[rd_addr_renderer]; // read lookup functionality for the vga renderer
     assign rd_data_fsm = board[rd_addr_fsm]; // read lookup functionality for the fsm
