@@ -5,7 +5,7 @@ Top File
 Marshall Graves & Sheel Shah -- FPGA Chess
 Created: 4/14/26
 
-Original file; loosely inspired by vga_top.v -- ee354 created 12:18:00 12/14/2017 by Yue (Julien) Niu 
+Original file
 
 */
 
@@ -21,19 +21,19 @@ module vga_top(
 	
     output  QuadSpiFlashCS,
 
-    //VGA signal
+    // VGA signals
 	output hSync, vSync,
 	output [3:0] vgaR, vgaG, vgaB,
 	
-	//SSG signal 
+	// SSD signals 
 	output An0, An1, An2, An3, An4, An5, An6, An7,
 	output Ca, Cb, Cc, Cd, Ce, Cf, Cg, Dp,
 
-    // switches
-    input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0, // Switches 15-12 for promotion and 2-0 for reset
+    // switches -- Switches 15-12 for promotion and 2-0 for reset
+    input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0,
 
-    // leds
-    output Ld3, Ld2, Ld1, Ld0 // Ld3 for piece_selected flag, Ld2 - Ld0 to show state- Ld2 is MOVING, Ld1 is PIECE_SELECTED, LD0 is IDLE
+    // leds -- Ld4 for piece_selected flag, Ld3 - Ld0 to show state- Ld3 is MOVING, Ld2 is CHECK_2, Ld1 is PIECE_SELECTED, LD0 is IDLE
+    output Ld4, Ld3, Ld2, Ld1, Ld0
 	
 	);
 
@@ -102,7 +102,7 @@ module vga_top(
 	wire [1:0] state;
 	wire error_flag; 
     assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
-	wire [3:0] shadow_baord [63:0]; // latched board state for check_2 detection
+	wire [255:0] shadow_baord_flat; // latched board state for check_2 detection
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
 		.scen_c(scen_c), .mcen_u(mcen_u), .mcen_d(mcen_d), .mcen_l(mcen_l), .mcen_r(mcen_r),
@@ -116,7 +116,7 @@ module vga_top(
 		.error_flag(error_flag),
     .valid(valid),
 		.check_1(check_1), .check_2(check_2),
-    .board_flat(board_flat_out), .shadow_board(shadow_board)
+    .board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat)
 	);
 
     // VGA Renderer
@@ -153,18 +153,16 @@ module vga_top(
 	// Check 1 -- current in check detection during IDLE
 	wire check_1;
 	check_detection cd1(
-		.board(board_out),
-		.src(mv_src),
-		.dst(mv_dst),
+		.board_flat(board_flat_out),
+		.current_turn(current_turn),
 		.check(check_1)
 	);
 
 	// Check 2 -- moving into check detection
 	wire check_2;
 	check_detection cd2(
-		.board(shadow_board),
-		.src(mv_src),
-		.dst(mv_dst),
+		.board_flat(shadow_board_flat),
+		.current_turn(current_turn),
 		.check(check_2)
 	);
 	
