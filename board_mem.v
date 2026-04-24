@@ -64,11 +64,19 @@ module board_mem (
     output [3:0] rd_data_renderer, // read data for renderer
     input [5:0] rd_addr_fsm, // read address for fsm
     output [3:0] rd_data_fsm, // read data for fsm
-    output [3:0] board_out [63:0] // board_out for move_validator and check_detection which need full board (and also fsm, but only for the purpose of check detection)
+    output [255:0] board_flat_out // board_out for move_validator and check_detection which need full board (and also fsm, but only for the purpose of check detection) -- unfortunately verilog needs it to be flattened
 );
 
     reg [3:0] board [0:63]; // board memory init
     assign board_out = board;
+
+    // creating board_out which needs to be flattened - uses a generate-specific loop which is an elaboration time-only (when compiler is)
+    // building the circuit) -- each 4-bit encoding is unpacked from its square and listed in groups consequetively
+    genvar g; // generate loop
+    generate
+        for (g = 0; g < 64; g = g + 1) // just a simple loop to flatten board from essentially a 2d array to 1d
+            assign board_flat_out[g*4 +: 4] = board[g];
+    endgenerate
 
     assign rd_data_renderer = board[rd_addr_renderer]; // read lookup functionality for the vga renderer
     assign rd_data_fsm = board[rd_addr_fsm]; // read lookup functionality for the fsm

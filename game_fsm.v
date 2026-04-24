@@ -71,6 +71,7 @@ module game_fsm (
         else begin
 
             wr_en <= 0; // always disable write at start
+            error_flag <= 0; // always clear error flag
 
             case (state)
 
@@ -118,7 +119,7 @@ module game_fsm (
 
                         // if not valid set error flash flag
                         else if (!valid)
-                            error_flag = 1;
+                            error_flag <= 1;
                     end
                 end
 
