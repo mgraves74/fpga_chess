@@ -139,7 +139,7 @@ module vga_top(
 	wire [5:0] mv_dst = {cursor_row, cursor_col}; // destination (current cursor and row)
 
 	move_validator mv(
-		.board(board_flat_out),
+		.board_flat(board_flat_out),
 		.src(mv_src),
 		.dst(mv_dst),
 		.valid(valid)
