@@ -21,6 +21,9 @@ module game_fsm (
     input mcen_r, // right button mcen pulse
     input [3:0] rd_data_fsm, // read board memory
     input valid,
+    input check_1,
+    input check_2,
+    input [3:0] board [63:0], // current board state
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -30,14 +33,16 @@ module game_fsm (
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
-    output reg [1:0] state // 2 bit state encoding for 3 states, exposed for showing state on LEDs
-    output reg error_flag // flag to indicate that an error has been produced from an invalidated move
+    output reg [1:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg error_flag, // flag to indicate that an error has been produced from an invalidated move
+    output reg [3:0] shadow_board [63:0] // board latched at the begging of PIECE_SELECTED for check_2 detection
     );
 
     // states 
     localparam IDLE = 2'b00;
     localparam PIECE_SELECTED = 2'b01;
     localparam MOVING = 2'b10;
+    localparam CHECK_2 = 2'b11;
      
     reg move_phase; // move phase flag for "moving" state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
@@ -95,6 +100,8 @@ module game_fsm (
                     if (mcen_l && cursor_col > 0) cursor_col <= cursor_col - 1; // left
                     if (mcen_r && cursor_col < 7) cursor_col <= cursor_col + 1; // right
 
+                    assign shadow_baord = board; // latch board state at the beginning of piece selected
+
                     if (scen_c) begin
 
                         // PIECE_SELECTED --> IDLE: if selected original square again
@@ -135,6 +142,11 @@ module game_fsm (
                         cursor_col <= 3'd4;
                         state <= IDLE;
                     end
+                end
+
+                // CHECK_2 state
+                CHECK_2: begin
+                    
                 end
 
             endcase

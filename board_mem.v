@@ -63,10 +63,12 @@ module board_mem (
     input [5:0] rd_addr_renderer, // read address for renderer
     output [3:0] rd_data_renderer, // read data for renderer
     input [5:0] rd_addr_fsm, // read address for fsm
-    output [3:0] rd_data_fsm // read data for fsm
+    output [3:0] rd_data_fsm, // read data for fsm
+    output [3:0] board_out [63:0] // board_out for move_validator and check_detection which need full board (and also fsm, but only for the purpose of check detection)
 );
 
     reg [3:0] board [0:63]; // board memory init
+    assign board_out = board;
 
     assign rd_data_renderer = board[rd_addr_renderer]; // read lookup functionality for the vga renderer
     assign rd_data_fsm = board[rd_addr_fsm]; // read lookup functionality for the fsm
