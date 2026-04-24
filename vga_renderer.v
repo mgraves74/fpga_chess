@@ -40,6 +40,7 @@ Selected: 4-pixel green border drawn around square
 `timescale 1ns / 1ps
 
 module vga_renderer(
+    input clk,
     input bright,
     input [9:0] hCount, vCount,
     input [3:0] rd_data_renderer,
@@ -59,7 +60,7 @@ module vga_renderer(
 
     parameter CURSOR_COLOR = 12'hFF0; // cursor color
     parameter SELECTED_COLOR = 12'h0F0; // selected square color
-    parameter ERROR_COLOR = 12'hF00 // red error color
+    parameter ERROR_COLOR = 12'hF00; // red error color
 
     // Currently the pieces are represented by colors not sprites -- see color mapping in Key Information
     parameter PAWN_W   = 12'hFFF;

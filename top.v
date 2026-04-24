@@ -87,7 +87,12 @@ module vga_top(
 	wire [3:0] rd_data_renderer;
     wire [5:0] rd_addr_fsm;
 	wire [3:0] rd_data_fsm;
-	board_mem bm(.clk(ClkPort), .reset(Reset), .wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), .rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), .rd_addr_fsm(rd_addr_fsm), .rd_data_fsm(rd_data_fsm));
+	wire [255:0] board_flat_out;
+	board_mem bm(.clk(ClkPort), .reset(Reset), 
+		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), 
+		.rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), 
+		.rd_addr_fsm(rd_addr_fsm), .rd_data_fsm(rd_data_fsm),
+		.board_flat_out(board_flat_out));
 
     // Game FSM
     wire [2:0] cursor_row, cursor_col;
@@ -107,13 +112,15 @@ module vga_top(
 		.piece_selected(piece_selected),
 		.current_turn(current_turn),
 		.state(state),
-		.error_flag(error_flag)
+		.error_flag(error_flag),
+		.valid(valid)
 	);
 
     // VGA Renderer
 	vga_renderer vr(
+		.clk(ClkPort),
 		.bright(bright), .hCount(hc), .vCount(vc),
-		.rd_data_renderer(rd_data_renderer), .rd_addr_renderer(rd_addr_renderer)
+		.rd_data_renderer(rd_data_renderer), .rd_addr_renderer(rd_addr_renderer),
 		.cursor_row(cursor_row), .cursor_col(cursor_col),
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
@@ -132,7 +139,7 @@ module vga_top(
 	wire [5:0] mv_dst = {cursor_row, cursor_col}; // destination (current cursor and row)
 
 	move_validator mv(
-		.board(board_out),
+		.board(board_flat_out),
 		.src(mv_src),
 		.dst(mv_dst),
 		.valid(valid)
@@ -165,7 +172,7 @@ module vga_top(
 	// Error display timer
 	reg [27:0] ssd_error_timer; // 2^28 / 100000000 = 2.684 sec
 
-	always @(posedge clk) begin
+	always @(posedge ClkPort) begin
 		if (error_flag)
 			ssd_error_timer <= 28'd0;
 		else if (ssd_error_timer < 28'd200000000) // times exactly 2 + 1/10^8 sec

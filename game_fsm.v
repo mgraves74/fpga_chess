@@ -30,7 +30,7 @@ module game_fsm (
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
-    output reg [1:0] state // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg [1:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
     output reg error_flag // flag to indicate that an error has been produced from an invalidated move
     );
 
@@ -66,6 +66,7 @@ module game_fsm (
         else begin
 
             wr_en <= 0; // always disable write at start
+            error_flag <= 0; // always clear error flag
 
             case (state)
 
@@ -111,7 +112,7 @@ module game_fsm (
 
                         // if not valid set error flash flag
                         else if (!valid)
-                            error_flag = 1;
+                            error_flag <= 1;
                     end
                 end
 

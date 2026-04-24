@@ -30,11 +30,19 @@ Final validation = geometric validation && path validation && capture validation
 `timescale 1ns / 1ps
 
 module move_validator (
-    input [3:0] board [0:63],
+    input [255:0] board_flat,
     input [5:0] src,
     input [5:0] dst,
     output reg valid
 );
+
+// unflattening board
+wire [3:0] board [0:63];
+genvar g;
+generate
+    for (g = 0; g < 64; g = g + 1)
+        assign board[g] = board_flat[g*4 +: 4];
+endgenerate
 
 // getting source and destination columns and rows separate from combined 6-bit port
 wire [2:0] src_row = src[5:3];   wire [2:0] src_col = src[2:0];
@@ -160,6 +168,9 @@ begin
         
         // Bishop
         4'b0011, 4'b1011: valid = bishop_geo_valid && !not_empty_bishop && !dst_friendly;
+
+        // Knight
+        4'b0010, 4'b1010: knight_valid && !dst_friendly;
 
         // Queen
         4'b0101, 4'b1101: valid = ((rook_geo_valid && !not_empty_rook) || (bishop_geo_valid && !not_empty_bishop)) && !dst_friendly;
