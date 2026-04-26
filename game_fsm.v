@@ -21,7 +21,6 @@ module game_fsm (
     input mcen_r, // right button mcen pulse
     input [3:0] rd_data_fsm, // read board memory
     input valid,
-    input check_1,
     input check_2,
     input [255:0] board_flat, // current board state
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
@@ -33,22 +32,25 @@ module game_fsm (
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
-    output reg [1:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg [2:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
     output reg error_flag, // flag to indicate that an error has been produced from an invalidated move
     output reg [255:0] shadow_board_flat // board latched at the begging of PIECE_SELECTED for check_2 detection
     );
 
     // states 
-    localparam IDLE = 2'b00;
-    localparam PIECE_SELECTED = 2'b01;
-    localparam CHECK_2 = 2'b10;
-    localparam MOVING = 2'b11;
+    localparam IDLE = 3'b000;
+    localparam PIECE_SELECTED = 3'b001;
+    localparam SHADOW_MOVING = 3'b010;
+    localparam CHECK_2 = 3'b011;
+    localparam MOVING = 3'b100;
      
-    reg move_phase; // move phase flag for "moving" state (see below)
+    reg move_phase; // move phase flag for MOVING state (see below)
+    reg shadow_move_phase; // shadow move phase flag for SHADOW_MOVING state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
 
     wire [5:0] sel_addr = sel_row * 8 + sel_col; // board memory address of the first/source selected piece
     wire [5:0] dst_addr = cursor_row * 8 + cursor_col; // board memory address of second/destination selected piece
+    reg [5:0] dst_addr_latched; // lached dst_addr for shadow board
 
     always @(posedge clk, posedge reset) begin
 
@@ -62,6 +64,7 @@ module game_fsm (
             piece_selected <= 0; // flag inits
             current_turn <= 0;
             move_phase <= 0;
+            shadow_move_phase <= 0;
             moving_piece <= 4'b0000; // set moving piece to empty
             wr_en <= 0; // init disable write
             wr_addr <= 0;
@@ -101,8 +104,6 @@ module game_fsm (
                     if (mcen_l && cursor_col > 0) cursor_col <= cursor_col - 1; // left
                     if (mcen_r && cursor_col < 7) cursor_col <= cursor_col + 1; // right
 
-                    assign shadow_baord_flat = board_flat; // latch board state at the beginning of piece selected
-
                     if (scen_c) begin
 
                         // PIECE_SELECTED --> IDLE: if selected original square again
@@ -112,8 +113,11 @@ module game_fsm (
                         end 
                         
                         // PIECE_SELECTED --> CHECK_2: if other square & if move valid
-                        else if (valid)
-                            state <= CHECK_2;
+                        else if (valid) begin
+                            shadow_board_flat <= board_flat; // latch board state when transitioning to shadow_moving to perform the move on the shadow board
+                            dst_addr_latched <= dst_addr;
+                            state <= SHADOW_MOVING;
+                        end
 
                         // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
 
@@ -123,6 +127,20 @@ module game_fsm (
                     end
                 end
 
+                // SHADOW_MOVING state
+                SHADOW_MOVING: begin
+                    
+                    // shadow_move phase for 2-clock sequence in the same way as MOVING state
+                    if (shadow_move_phase == 0) begin
+                        shadow_board_flat[dst_addr_latched*4 +: 4] <= moving_piece; // write data to new square -- 4-bit part select on flat shadow board
+                        shadow_move_phase <= 1; // set flag once destination is written
+                    end else begin
+                        shadow_board_flat[sel_addr*4 + : 4] <= 4'b0000; // write empty to old square
+                        shadow_move_phase <= 0; // clear flag
+                        state <= CHECK_2;
+                    end
+                end
+                
                 // CHECK_2 state
                 CHECK_2: begin
                     if (check_2) begin

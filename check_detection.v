@@ -50,11 +50,11 @@ wire [2:0] king_row, king_col;
 assign king_row = king_pos[5:3];
 assign king_col = king_pos[2:0];
 
-integer i;
+reg [6:0] i; // 7-bit incrementer for king pos search
 
 always @(*) begin
     king_pos = 0;
-    for (i = 0; i < 64; i = i + 1) begin
+    for (i = 0; i <= 63; i = i + 1) begin
         // Find position of the white king
         if (!current_turn) begin
             if (board[i] == 4'b0110) king_pos = i;
@@ -83,19 +83,209 @@ reg [2:0] r, c; // current ray step's row and colum
 reg [3:0] target; // the piece at the current ray step
 reg blocked; // flag for stopping at the first piece
 
-// Knight Check -- TBD
+// Knight Check
 always @(*)
 begin
+    knight_check = 0;
 
-
-
+    // checking all 8 possible squares from the king where an enemy knight could be attacking
+    if (king_row >= 2 && king_col >= 1) begin // these comparisons provide boundary checking as to not look at a wrapped around square
+        if (board[(king_row-2)*8 + (king_col-1)] == enemy_knight) knight_check = 1; // 2 up, 1 left
+    end
+    if (king_row >= 2 && king_col <= 6) begin
+        if (board[(king_row-2)*8 + (king_col+1)] == enemy_knight) knight_check = 1; // 2 up, 1 right 
+    end
+    if (king_row >= 1 && king_col >= 2) begin
+        if (board[(king_row-1)*8 + (king_col-2)] == enemy_knight) knight_check = 1; // 1 up, 2 left
+    end
+    if (king_row >= 1 && king_col <= 5) begin
+        if (board[(king_row-1)*8 + (king_col+2)] == enemy_knight) knight_check = 1; // 1 up, 2 right
+    end
+    if (king_row <= 6 && king_col >= 2) begin
+        if (board[(king_row+1)*8 + (king_col-2)] == enemy_knight) knight_check = 1; // 1 down, 2 left
+    end
+    if (king_row <= 6 && king_col <= 5) begin
+        if (board[(king_row+1)*8 + (king_col+2)] == enemy_knight) knight_check = 1; // 1 down, 2 right
+    end
+    if (king_row <= 5 && king_col >= 1) begin
+        if (board[(king_row+2)*8 + (king_col-1)] == enemy_knight) knight_check = 1; // 2 down, 1 left
+    end
+    if (king_row <= 5 && king_col <= 6) begin
+        if (board[(king_row+2)*8 + (king_col+1)] == enemy_knight) knight_check = 1; // 2 down, 1 right
+    end
 end
 
-// Ray Check -- TBD
+// Ray Check
+reg [3:0] j; // 4-bit incrementer for all ray checks
 always @(*)
 begin
+    ray_check = 0;
 
+    // straight rays -- rook, queen, king
+    // up
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_row >= j) begin // boundary check- stops if increments king_row times up
+            r = king_row - j; // increment row up
+            c = king_col;
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
 
+                // for 1 up, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for j up, check if enemy rook or queen
+                if (target == enemy_rook || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // down
+    blocked = 0;
+    for (j = 1; j < 8; j  = j + 1) begin
+        if (!blocked && king_row + j <= 7) begin // boundary check- stop after increments from king_row to 7
+            r = king_row + j; // increment row down
+            c = king_col;
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 down, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for j down, check if enemy rook or queen
+                if (target == enemy_rook || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // left
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_col >= j) begin // boundary check- stops if increments king_col times left
+            r = king_row;
+            c = king_col - j; // increment column left
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 left, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for j left, check if enemy rook or queen
+                if (target == enemy_rook || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // right
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_col + j <= 7) begin // boundary check- stops after increments from king_col to 7
+            r = king_row;
+            c = king_col + j; // increment column right
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 right, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for j right, check if enemy rook or queen
+                if (target == enemy_rook || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // diagonal rays -- bishop, queen, pawn, king
+    // diagonal up-left
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_row >= j && king_col >= j) begin // boundary check - stops if increments king_row and king_col times up-left
+            r = king_row - j; // increment row up
+            c = king_col - j; // increment column left
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 up-left, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for 1 up-left, if white, check if enemy pawn
+                if (j == 1 && !current_turn && target == enemy_pawn) ray_check = 1;
+
+                // for j up-left, check if bishop or queen
+                if (target == enemy_bishop || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // diagonal up-right
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_row >= j && king_col + j <= 7) begin // boundary check - stops if increments king_row up and after increments from king_col to 7
+            r = king_row - j; // increment row up
+            c = king_col + j; // increment column right
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 up-right, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for 1 up-right, if white, check if enemy pawn
+                if (j == 1 && !current_turn && target == enemy_pawn) ray_check = 1;
+
+                // for j up-right, check if bishop or queen
+                if (target == enemy_bishop || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // diagonal down-left
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_row + j <= 7 && king_col >= j) begin // boundary check - stops after increments from king_row to 7 and if king_col times left
+            r = king_row + j; // increment row down
+            c = king_col - j; // increment column left
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 down-left, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for 1 down-left, if black, check if enemy pawn
+                if (j == 1 && current_turn && target == enemy_pawn) ray_check = 1;
+
+                // for j down-left, check if bishop or queen
+                if (target == enemy_bishop || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
+
+    // diagonal down-right
+    blocked = 0;
+    for (j = 1; j < 8; j = j + 1) begin
+        if (!blocked && king_row + j <= 7 && king_col + j <= 7) begin // boundary check - stops after increments king_row and king_col to 7
+            r = king_row + j; // increment row down
+            c = king_col + j; // increment row right
+            target = board[r*8 + c];
+            if (target != 4'b0000) begin
+                blocked = 1; // if not empty set blocked
+
+                // for 1 down-right, check if enemy king
+                if (j == 1 && target == enemy_king) ray_check = 1;
+
+                // for 1 down-right, if black, check if enemy pawn
+                if (j == 1 && current_turn && target == enemy_pawn) ray_check = 1;
+
+                // for j down-right, check if bishop or queen
+                if (target == enemy_bishop || target == enemy_queen) ray_check = 1;
+            end
+        end
+    end
 
 end
 

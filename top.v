@@ -32,8 +32,8 @@ module vga_top(
     // switches -- Switches 15-12 for promotion and 2-0 for reset
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0,
 
-    // leds -- Ld4 for piece_selected flag, Ld3 - Ld0 to show state- Ld3 is MOVING, Ld2 is CHECK_2, Ld1 is PIECE_SELECTED, LD0 is IDLE
-    output Ld4, Ld3, Ld2, Ld1, Ld0
+    // leds
+    output Ld5, Ld4, Ld3, Ld2, Ld1, Ld0
 	
 	);
 
@@ -47,8 +47,8 @@ module vga_top(
 	wire [11:0] rgb;
 
     // SSD inst
-	reg [4:0]  SSD;
-	wire [4:0] SSD7, SSD6, SSD5, SSD4, SSD3, SSD2, SSD1, SSD0;
+	reg [3:0]  SSD;
+	wire [3:0] SSD7, SSD6, SSD5, SSD4, SSD3, SSD2, SSD1, SSD0;
 	reg [7:0]  SSD_CATHODES;
 	wire [2:0] ssdscan_clk; 
 	
@@ -73,6 +73,7 @@ module vga_top(
 
     // Chess debouncers - 5, one for each button
     wire scen_c, mcen_u, mcen_d, mcen_l, mcen_r;
+
     chess_debouncer dbc(.CLK(ClkPort), .RESET(Reset), .PB(BtnC), .DPB(), .SCEN(scen_c), .MCEN(), .CCEN()); // center - SCEN only
 	chess_debouncer dbu(.CLK(ClkPort), .RESET(Reset), .PB(BtnU), .DPB(), .SCEN(),       .MCEN(mcen_u), .CCEN()); // Up - MCEN only
 	chess_debouncer dbr(.CLK(ClkPort), .RESET(Reset), .PB(BtnR), .DPB(), .SCEN(),       .MCEN(mcen_r), .CCEN()); // Right - MCEN only
@@ -88,6 +89,7 @@ module vga_top(
     wire [5:0] rd_addr_fsm;
 	wire [3:0] rd_data_fsm;
 	wire [255:0] board_flat_out;
+
 	board_mem bm(.clk(ClkPort), .reset(Reset), 
 		.wr_addr(wr_addr), .wr_data(wr_data), .wr_en(wr_en), 
 		.rd_addr_renderer(rd_addr_renderer), .rd_data_renderer(rd_data_renderer), 
@@ -99,10 +101,13 @@ module vga_top(
 	wire [2:0] sel_row, sel_col;
 	wire piece_selected;
 	wire current_turn;
-	wire [1:0] state;
+	wire [2:0] state;
 	wire error_flag; 
     assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
-	wire [255:0] shadow_baord_flat; // latched board state for check_2 detection
+	wire [255:0] shadow_board_flat; // latched board state for check_2 detection
+	wire valid;
+	wire check_2;
+
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
 		.scen_c(scen_c), .mcen_u(mcen_u), .mcen_d(mcen_d), .mcen_l(mcen_l), .mcen_r(mcen_r),
@@ -114,9 +119,9 @@ module vga_top(
 		.current_turn(current_turn),
 		.state(state),
 		.error_flag(error_flag),
-    .valid(valid),
-		.check_1(check_1), .check_2(check_2),
-    .board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat)
+    	.valid(valid),
+		.check_2(check_2),
+    	.board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat)
 	);
 
     // VGA Renderer
@@ -131,13 +136,8 @@ module vga_top(
 		.error_flag(error_flag)
 	);
 
-	assign vgaR = rgb[11:8];
-	assign vgaG = rgb[7:4];
-	assign vgaB = rgb[3:0];
-
 	// Move validator
 
-	wire valid;
 	wire [5:0] mv_src = {sel_row, sel_col}; // source (selected column and row)
 	wire [5:0] mv_dst = {cursor_row, cursor_col}; // destination (current cursor and row)
 
@@ -159,23 +159,44 @@ module vga_top(
 	);
 
 	// Check 2 -- moving into check detection
-	wire check_2;
 	check_detection cd2(
 		.board_flat(shadow_board_flat),
 		.current_turn(current_turn),
 		.check(check_2)
 	);
 	
+	//-------//
+    //  VGA  //
+    //-------//
+
+	assign vgaR = rgb[11:8];
+	assign vgaG = rgb[7:4];
+	assign vgaB = rgb[3:0];
+
     //------------------//
     //     LED Code     //
     //------------------//
     
-    // LED inst
-	assign Ld4 = piece_selected;
-	assign Ld3 = (state == 2'b11) ? 1'b1 : 1'b0;
-	assign Ld2 = (state == 2'b10) ? 1'b1 : 1'b0;
-	assign Ld1 = (state == 2'b01) ? 1'b1 : 1'b0;
-	assign Ld0 = (state == 2'b00) ? 1'b1 : 1'b0;
+	/*
+
+	Ld5 for piece_selected flag
+
+	Ld4 - Ld0 to show state:
+	Ld4 is MOVING
+	Ld3 is CHECK_2
+	Ld2 is SHADOW_MOVING
+	Ld1 is PIECE_SELECTED
+	LD0 is IDLE
+
+	*/
+
+    // LED instantiations
+	assign Ld5 = piece_selected;
+	assign Ld4 = (state == 3'b100) ? 1'b1 : 1'b0;
+	assign Ld3 = (state == 3'b011) ? 1'b1 : 1'b0;
+	assign Ld2 = (state == 3'b010) ? 1'b1 : 1'b0;
+	assign Ld1 = (state == 3'b001) ? 1'b1 : 1'b0;
+	assign Ld0 = (state == 3'b000) ? 1'b1 : 1'b0;
 
 	//------------------//
     //     SSD Code     //
@@ -213,7 +234,7 @@ module vga_top(
 	assign SSD3 = 4'b0100; // G -- blank if !error_flash_ssd
 	assign SSD2 = error_flash_ssd ? 4'b0000 : 4'b0010; // A : C -- blank if !(error_flash_ssd || check_1)
 	assign SSD1 = error_flash_ssd ? 4'b1000: (check_1 ? 4'b0101 : 4'b0100); // L : (H : G)
-	assign SSD0 = check_1 ? 4'0111 : 4'b1010; // K : O -- blank if error_flash_ssd
+	assign SSD0 = check_1 ? 4'b0111 : 4'b1010; // K : O -- blank if error_flash_ssd
     
     /*
 	Scan clock for the SSD display - all 8 SSDs
