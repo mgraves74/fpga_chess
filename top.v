@@ -33,7 +33,7 @@ module vga_top(
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0,
 
     // leds
-    output Ld5, Ld4, Ld3, Ld2, Ld1, Ld0
+    output Ld7, Ld6, Ld5, Ld4, Ld3, Ld2, Ld1, Ld0
 	
 	);
 
@@ -181,7 +181,9 @@ module vga_top(
 
 	Ld5 for piece_selected flag
 
-	Ld4 - Ld0 to show state:
+	Ld6 - Ld0 to show state:
+	Ld6 is GAME_OVER
+	Ld5 is CHECKMATE_DETECT
 	Ld4 is MOVING
 	Ld3 is CHECK_2
 	Ld2 is SHADOW_MOVING
@@ -191,7 +193,9 @@ module vga_top(
 	*/
 
     // LED instantiations
-	assign Ld5 = piece_selected;
+	assign Ld7 = piece_selected;
+	assign Ld6 = (state == 3'b110) ? 1'b1 : 1'b0;
+	assign Ld5 = (state == 3'b101) ? 1'b1 : 1'b0;
 	assign Ld4 = (state == 3'b100) ? 1'b1 : 1'b0;
 	assign Ld3 = (state == 3'b011) ? 1'b1 : 1'b0;
 	assign Ld2 = (state == 3'b010) ? 1'b1 : 1'b0;

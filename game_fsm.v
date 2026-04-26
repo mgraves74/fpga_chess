@@ -42,7 +42,9 @@ module game_fsm (
     localparam PIECE_SELECTED = 3'b001;
     localparam SHADOW_MOVING = 3'b010;
     localparam CHECK_2 = 3'b011;
-    localparam MOVING = 3'b100;
+    localparam CHECKMATE_DETECT = 3'b100;
+    localparam MOVING = 3'b101;
+    localparam GAME_OVER = 3'b110;
      
     reg move_phase; // move phase flag for MOVING state (see below)
     reg shadow_move_phase; // shadow move phase flag for SHADOW_MOVING state (see below)
@@ -150,6 +152,11 @@ module game_fsm (
                         state <= MOVING;
                 end
 
+                // CHECKMATE_DETECT state
+                CHECKMATE_DETECT: begin
+
+                end
+
                 // MOVING state
                 MOVING: begin
                     
@@ -171,7 +178,11 @@ module game_fsm (
                         state <= IDLE;
                     end
                 end
-
+                
+                // GAME_OVER state
+                Game_OVER: begin
+                    
+                end
             endcase
         end
     end
