@@ -23,6 +23,8 @@ module game_fsm (
     input valid,
     input check_2,
     input [255:0] board_flat, // current board state
+    input [5:0] attacker_pos, // position of the attacker for checkmate detection
+    input [5:0] king_pos, // position of the king for checkmate detection
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -34,7 +36,9 @@ module game_fsm (
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
     output reg [2:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
     output reg error_flag, // flag to indicate that an error has been produced from an invalidated move
-    output reg [255:0] shadow_board_flat // board latched at the begging of PIECE_SELECTED for check_2 detection
+    output reg [255:0] shadow_board_flat, // board latched at the begging of PIECE_SELECTED for check_2 detection
+    output reg game_over, // game_over flag to enable ssd and vga game over displays
+    output reg winner // winner for ssd and vga display
     );
 
     // states 
@@ -54,6 +58,29 @@ module game_fsm (
     wire [5:0] dst_addr = cursor_row * 8 + cursor_col; // board memory address of second/destination selected piece
     reg [5:0] dst_addr_latched; // lached dst_addr for shadow board
 
+    // Ouputs from cm module
+    wire [5:0] cm_src; // checkmate detection candidate source square
+    wire [5:0] cm_dst; // checkmate detection candidate destination square
+    wire candidates_exhausted; // flag set when all checkmate prevention candidates have been exhausted
+    
+    // Inputs to cm module
+    reg cm_advance; // flag for checkmate detection to increment to the next candidate
+    reg [5:0] attacker_pos_latched; // latched attacker position 
+    reg [5:0] king_pos_latched; // latched king position
+    reg from_checkmate; // flag to control whether a shadow move is on a checkmate_detection or check_detection operation
+
+    // Checkmate Detection Module Instantiation
+    checkmate_detection cm_inst (
+        .board_flat(board_flat),
+        .current_turn(current_turn),
+        .attacker_pos_latched(attacker_pos_latched),
+        .king_pos_latched(king_pos_latched),
+        .cm_advance(cm_advance),
+        .cm_src(cm_src),
+        .cm_dst(cm_dst),
+        .candidates_exhausted(candidates_exhausted)
+    );
+
     always @(posedge clk, posedge reset) begin
 
         // reset conditions
@@ -63,20 +90,26 @@ module game_fsm (
             cursor_col <= 3'd4;
             sel_row <= 3'd0; // init selected to 00 which is blacks rook, but it doesn't matter because no flag set anyway
             sel_col <= 3'd0;
-            piece_selected <= 0; // flag inits
+            piece_selected <= 0;
             current_turn <= 0;
             move_phase <= 0;
             shadow_move_phase <= 0;
             moving_piece <= 4'b0000; // set moving piece to empty
-            wr_en <= 0; // init disable write
+            wr_en <= 0;
             wr_addr <= 0;
             wr_data <= 0;
+            attacker_pos_latched <= 0;
+            king_pos_latched <= 0;
+            from_checkmate <= 0;
+            cm_advance <= 0;
+            game_over <= 0;
         end
 
         else begin
 
             wr_en <= 0; // always disable write at start
             error_flag <= 0; // always clear error flag
+            cm_advance <= 0; // always clear checkmate detection candidate advance flag
 
             case (state)
 
@@ -121,45 +154,75 @@ module game_fsm (
                             state <= SHADOW_MOVING;
                         end
 
-                        // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
-
                         // if not valid set error flash flag
                         else if (!valid)
                             error_flag <= 1;
+
+                        // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
+                        
                     end
                 end
 
                 // SHADOW_MOVING state
                 SHADOW_MOVING: begin
-                    
-                    // shadow_move phase for 2-clock sequence in the same way as MOVING state
-                    if (shadow_move_phase == 0) begin
-                        shadow_board_flat[dst_addr_latched*4 +: 4] <= moving_piece; // write data to new square -- 4-bit part select on flat shadow board
-                        shadow_move_phase <= 1; // set flag once destination is written
+                    if (!from_checkmate) begin
+                        // shadow_move phase for 2-clock sequence in the same way as MOVING state
+                        if (shadow_move_phase == 0) begin
+                            shadow_board_flat[dst_addr_latched*4 +: 4] <= moving_piece; // write data to new square -- 4-bit part select on flat shadow board
+                            shadow_move_phase <= 1; // set flag once destination is written
+                        end else begin
+                            shadow_board_flat[sel_addr*4 + : 4] <= 4'b0000; // write empty to old square
+                            shadow_move_phase <= 0; // clear flag
+                            state <= CHECK_2;
+                        end
                     end else begin
-                        shadow_board_flat[sel_addr*4 + : 4] <= 4'b0000; // write empty to old square
-                        shadow_move_phase <= 0; // clear flag
-                        state <= CHECK_2;
+                        // shadow_move phase for a checkmate_detection operation
+                        if (shadow_move_phase == 0) begin
+                            shadow_board_flat[cm_dst*4 +: 4] <= board_flat[cm_src*4 +: 4]; // write cm_src data
+                            shadow_move_phase <= 1;
+                        end else begin
+                            shadow_board_flat[cm_src*4 + : 4] <= 4'b0000; // write empty
+                            shadow_move_phase <= 0;
+                            state <= CHECK_2;
+                        end
                     end
                 end
                 
                 // CHECK_2 state
                 CHECK_2: begin
-                    if (check_2) begin
-                        state <= PIECE_SELECTED;
-                        error_flag <= 1;     
-                    end else // !check_2
-                        state <= MOVING;
+                    if (!from_checkmate) begin
+                        if (check_2) begin
+                            error_flag <= 1; // set error flag since still in check
+                            state <= CHECKMATE_DETECT; // since in check, now check if actually checkmate
+                            attacker_pos_latched <= attacker_pos; // latch attacker and king position here for checkmate detection
+                            king_pos_latched <= king_pos;
+                            from_checkmate <= 1; 
+                        end else // !check_2
+                            state <= MOVING;
+                    end else begin
+                        if (check_2 && !candidates_exhausted) begin
+                            state <= CHECKMATE_DETECT;
+                            cm_advance <= 1; // continue to test candidates if not exhausted
+                        end else if (check_2 && candidates_exhausted) begin
+                            state <= GAME_OVER; // game over if still in check when all checkmate prevention candidates are exhausted
+                            from_checkmate <= 0;
+                            game_over <= 1; // set game over flag
+                            winner <= ~current_turn; // winner is the openent when checkmate detected
+                        end else begin // !check_2
+                            state <= PIECE_SELECTED;  // if a candidate works then go back to PIECE_SELECTED
+                            from_checkmate <= 0;
+                        end
+                    end
                 end
 
                 // CHECKMATE_DETECT state
                 CHECKMATE_DETECT: begin
-
+                    shadow_board_flat <= board_flat; // only latch a new shadow board, other states handle inputs and outputs to cm module
+                    state <= SHADOW_MOVING;
                 end
 
                 // MOVING state
                 MOVING: begin
-                    
                     // The purpose of the move_phase flag is to make MOVING run for exactly 2 clocks, first to write to new square, second to clear first square
                     if (move_phase == 0) begin
                         wr_en <= 1;
@@ -180,8 +243,15 @@ module game_fsm (
                 end
                 
                 // GAME_OVER state
-                Game_OVER: begin
-                    
+                GAME_OVER: begin
+                    // continue to enable cursor movement (essentially for no reason but better than frozen screen)
+                    if (mcen_u && cursor_row > 0) cursor_row <= cursor_row - 1; // up
+                    if (mcen_d && cursor_row < 7) cursor_row <= cursor_row + 1; // down
+                    if (mcen_l && cursor_col > 0) cursor_col <= cursor_col - 1; // left
+                    if (mcen_r && cursor_col < 7) cursor_col <= cursor_col + 1; // right
+
+                    // must reset to go back to IDLE
+
                 end
             endcase
         end

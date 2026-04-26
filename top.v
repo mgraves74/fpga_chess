@@ -107,6 +107,8 @@ module vga_top(
 	wire [255:0] shadow_board_flat; // latched board state for check_2 detection
 	wire valid;
 	wire check_2;
+	wire [5:0] attacker_pos; // position of the attacker from check_detection
+	wire [5:0] king_pos; // position of the king from check_detection
 
 	game_fsm gf(
 		.clk(ClkPort), .reset(Reset),
@@ -121,7 +123,8 @@ module vga_top(
 		.error_flag(error_flag),
     	.valid(valid),
 		.check_2(check_2),
-    	.board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat)
+    	.board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat),
+		.attacker_pos(attacker_pos), king_pos(king_pos)
 	);
 
     // VGA Renderer
@@ -155,14 +158,18 @@ module vga_top(
 	check_detection cd1(
 		.board_flat(board_flat_out),
 		.current_turn(current_turn),
-		.check(check_1)
+		.check(check_1),
+		.attacker_pos(attacker_pos),
+		.king_pos(king_pos)
 	);
 
 	// Check 2 -- moving into check detection
 	check_detection cd2(
 		.board_flat(shadow_board_flat),
 		.current_turn(current_turn),
-		.check(check_2)
+		.check(check_2),
+		.attacker_pos(attacker_pos),
+		.king_pos(king_pos)
 	);
 	
 	//-------//
