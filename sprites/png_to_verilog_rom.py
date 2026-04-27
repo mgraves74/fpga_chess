@@ -1,3 +1,13 @@
+'''
+
+Sprite Generator Python File
+
+Marshall Graves & Sheel Shah -- FPGA Chess
+Created: 4/26/26
+
+Citation...
+
+'''
 # png_to_verilog_rom.py
 # Converts 60x60 PNG chess piece images to Verilog ROM modules for FPGA synthesis
 # Uses Block RAM inference via (* rom_style = "block" *) attribute
