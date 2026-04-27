@@ -72,7 +72,7 @@ module game_fsm (
 
     // Checkmate Detection Module Instantiation
     checkmate_detection cm_inst (
-        .clk(ClkPort), .reset(reset),
+        .clk(clk), .reset(reset),
         .board_flat(board_flat),
         .current_turn(current_turn),
         .attacker_pos_latched(attacker_pos_latched),
@@ -81,7 +81,8 @@ module game_fsm (
         .cm_src(cm_src),
         .cm_dst(cm_dst),
         .candidates_exhausted(candidates_exhausted),
-        .cm_skip(cm_skip)
+        .cm_skip(cm_skip),
+        .cm_init(cm_init)
     );
 
     always @(posedge clk, posedge reset) begin
@@ -106,6 +107,7 @@ module game_fsm (
             from_checkmate <= 0;
             cm_advance <= 0;
             game_over <= 0;
+            cm_init = 0;
         end
 
         else begin
@@ -113,6 +115,7 @@ module game_fsm (
             wr_en <= 0; // always disable write at start
             error_flag <= 0; // always clear error flag
             cm_advance <= 0; // always clear checkmate detection candidate advance flag
+            cm_init <= 0; // always clear checkmate detection sychronous reset
 
             case (state)
 
@@ -147,6 +150,7 @@ module game_fsm (
                         // PIECE_SELECTED --> IDLE: if selected original square again
                         if (cursor_row == sel_row && cursor_col == sel_col) begin
                             piece_selected <= 0;
+                            from_checkmate <= 0;
                             state <= IDLE;
                         end 
                         
@@ -200,6 +204,7 @@ module game_fsm (
                             attacker_pos_latched <= attacker_pos; // latch attacker and king position here for checkmate detection
                             king_pos_latched <= king_pos;
                             from_checkmate <= 1; 
+                            cm_init <= 1; // flag to reset (synchronously) checkmate detection counters only the first time
                         end else // !check_2
                             state <= MOVING;
                     end else begin

@@ -13,7 +13,7 @@ Original File
 
 Key Information:
 
-Checkmate detection algorithm happens in 3 phases
+Checkmate detection algorithm consists of a 3-state state machine reffered to as cm_phase with 3 phases:
 0. King move - checks up to 8 (depending on valid) square candidates for possible escape
 1. Capture - for all friendly pieces, checks if known attacker can be taken - this still requires a shadow move on the fsm side in the
 case of discovery or double check
@@ -31,16 +31,12 @@ module checkmate_detection (
     input [5:0] attacker_pos_latched, // latched attacker pos
     input [5:0] king_pos_latched,
     input cm_advance,
+    input cm_init,
     output reg [5:0] cm_src, // source square for checkmate detection shadow move
     output reg [5:0] cm_dst, // destination square for checkmate detection shadow move
     output reg candidates_exhausted,
     output reg cm_skip // flag to skip an invalid candidate
     );
-
-    reg [1:0] cm_phase; // checkmate dection algorithm phase - 0 - king escape, 1 - capture attacker, 2 - block attacker
-    reg [2:0] cm_king_move_idx; // king escape move iterator
-    reg [5:0] cm_piece_idx; // friendly piece location iterator
-    reg [2:0] cm_ray_idx; // king to attacker ray iterator
 
     // unwrap board
     wire [3:0] board [0:63];
@@ -50,6 +46,17 @@ module checkmate_detection (
             assign board[g] = board_flat[g*4 +: 4];
         end
     endgenerate
+
+    //-----------------//
+    // INITIALIZATIONS //
+    //-----------------//
+
+    // General
+
+    reg [1:0] cm_phase; // checkmate dection state machine phase - 0 - king escape, 1 - capture attacker, 2 - block attacker
+    reg [2:0] cm_king_move_idx; // king escape move counter - increments 8 (0-7) times total for all king moves
+    reg [5:0] cm_piece_idx; // friendly piece location counter - increments 64 times total for each square to check for friendly, valid, non-king candidates
+    reg [2:0] cm_ray_idx; // king to attacker ray counter - increments once every time cm_piece_idx increments 64 times (if in phase 2)
 
     // king and attacker position
     wire [2:0] king_row = king_pos_latched[5:3];
@@ -68,10 +75,6 @@ module checkmate_detection (
     wire ray_row_neg = (att_row < king_row);
     wire ray_col_pos = (att_col > king_col);
     wire ray_col_neg = (att_col < king_col);
-
-    //-----------------//
-    // INITIALIZATIONS //
-    //-----------------//
 
     // Phase 0
 
@@ -139,19 +142,19 @@ module checkmate_detection (
         
         // row component -- incrementing depending on direction of ray
         if (ray_row_pos)
-            ray_row = king_row + (cm_ray_idx + 1); // 
+            ray_row = king_row + (cm_ray_idx + 1); // add to king_row if attacker below king
         else if (ray_row_neg)
-            ray_row = king_row - (cm_ray_idx + 1);
+            ray_row = king_row - (cm_ray_idx + 1); // subtract to king_row if attacker above king
         else
-            ray_row = king_row;
+            ray_row = king_row; // if ray is a row, stays constant
 
         // col component
         if (ray_col_pos)
-            ray_col = king_col + (cm_ray_idx + 1);
+            ray_col = king_col + (cm_ray_idx + 1); // add to king_col if attacker right of king
         else if (ray_col_neg)
-            ray_col = king_col - (cm_ray_idx + 1);
+            ray_col = king_col - (cm_ray_idx + 1); // add to king_col if attacker left of king
         else
-            ray_col = king_col;
+            ray_col = king_col; // if ray is a column, stays constant
     end
 
     wire [5:0] ray_sq = ray_row * 8 + ray_col; // defining ray square
@@ -177,31 +180,111 @@ module checkmate_detection (
     always @(posedge clk, posedge reset) begin
         
         // reset conditions
-        if (reset) begin
-            cm_phase             <= 0;
-            cm_king_move_idx     <= 0;
-            cm_piece_idx         <= 0;
-            cm_ray_idx           <= 0;
+        if (reset) begin // asynchronous
+            cm_phase <= 0;
+            cm_king_move_idx <= 0;
+            cm_piece_idx <= 0;
+            cm_ray_idx <= 0;
             candidates_exhausted <= 0;
-            cm_skip              <= 0;
-            cm_src               <= 0;
-            cm_dst               <= 0;
+            cm_skip <= 0;
+            cm_src <= 0;
+            cm_dst <= 0;
+        end else if (cm_init) begin // synchronous
+            cm_phase <= 0;
+            cm_king_move_idx <= 0;
+            cm_piece_idx <= 0;
+            cm_ray_idx <= 0;
+            candidates_exhausted <= 0;
+            cm_skip <= 0;
+            cm_src <= 0;
+            cm_dst <= 0;
         end else begin
             candidates_exhausted <= 0; // always 0 when coming into checkmate_detection module to then in the case of checkmate set as 1 thus ending the game
-            cm_skip              <= 0; // always 0 when coming into checkmate_detection module to be then temporarily set as otherwise
+            cm_skip <= 0; // always 0 when coming into checkmate_detection module to be then temporarily set as otherwise
 
-        case (cm_phase)
-            2'd0: begin // phase 0
-            end
+            case (cm_phase)
+                2'd0: begin // phase 0
+                    if (!king_cand_in_bounds || king_cand_friendly) begin
+                        cm_skip <= 1; // skip if candidate not in bounds or square contains friendly piece
+                        if (cm_king_move_idx == 7) begin // if looking at last king move candidate
+                            cm_phase <= 2'd1; // go to next phase
+                            cm_king_move_idx <= 0;
+                            cm_piece_idx <= 0;
+                        end else
+                            cm_king_move_idx <= cm_king_move_idx + 1; // increment king move incrementer
+                    end else begin
+                        cm_src <= king_pos_latched; // set candidate move for fsm shadow move
+                        cm_dst <= king_cand_sq; // set destination move for fsm shadow move
+                        cm_skip <= 0; // don't skip
+                        if (cm_advance) begin // if fsm says to advance
+                            if (cm_king_move_idx == 7) begin // if looking at last king move candidate
+                                cm_phase <= 2'd1; // go to next phase
+                                cm_king_move_idx <= 0;
+                                cm_piece_idx <= 0;
+                            end else
+                                cm_king_move_idx <= cm_king_move_idx + 1; // increment king move incrementer
+                        end
+                    end
+                end
 
-            2'd1: begin // phase 1
-            end
+                2'd1: begin // phase 1
+                    if (!is_friendly_non_king || !mv_valid) begin
+                        cm_skip <= 1; // skip candidate if move to capture is not friendly, not valid, or is the king
+                        if (cm_piece_idx == 63) begin // if last candidate
+                            if (is_knight_attacker)
+                                candidates_exhausted <= 1; // knights can't be blocked so game over here
+                            else begin
+                                cm_phase <= 2'd2; // go to next phase
+                                cm_piece_idx <= 0;
+                                cm_ray_idx <= 0;
+                            end
+                        end else
+                            cm_piece_idx <= cm_piece_idx + 1; // increment friendly piece counter
+                    end else begin
+                        cm_src <= cm_piece_idx; // set candidate src for fsm
+                        cm_dst <= attacker_pos_latched; // set candidate dst for fsm
+                        cm_skip <= 0;
+                        if (cm_advance) begin // if advance
+                            if (cm_piece_idx == 63) begin // if last candidate
+                                if (is_knight_attacker)
+                                    candidates_exhausted <= 1; 
+                                else begin
+                                    cm_phase <= 2'd2;
+                                    cm_piece_idx <= 0;
+                                    cm_ray_idx <= 0;
+                                end
+                            end else
+                                cm_piece_idx <= cm_piece_idx + 1;
+                        end
+                    end
+                end
 
-            2'd2: begin // phase 2
-            end
-            
-        endcase
-    end
+                2'd2: begin // phase 2
+                    if (ray_reached_attacker) begin
+                        candidates_exhausted <= 1; // if all inbetween squares checked
+                    end else if (!is_friendly_non_king || !mv_valid) begin
+                        cm_skip <= 1; // skip candidate if move to inbetween square is not friendly, not valid, or is the king
+                        if (cm_piece_idx == 63) begin
+                            cm_ray_idx <= cm_ray_idx + 1; // increment to next inbetween square after checking all 64 squares for friendly, valid, non-king candidates
+                            cm_piece_idx <= 0; // reset piece candidate counter
+                        end else
+                            cm_piece_idx <= cm_piece_idx + 1; // increment piece candidate counter
+                    end else begin
+                        cm_src <= cm_piece_idx; // set src for fsm to perform shadow move
+                        cm_dst <= ray_sq; // set dst for fsm to perform shadow move
+                        cm_skip <= 0;
+                        if (cm_advance) begin // if advance
+                            if (cm_piece_idx == 63) begin
+                                cm_ray_idx <= cm_ray_idx + 1;
+                                cm_piece_idx <= 0;
+                            end else
+                                cm_piece_idx <= cm_piece_idx + 1;
+                        end
+                    end
+                end
+
+            endcase
+        end
     end
 
 endmodule
