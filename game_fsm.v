@@ -62,6 +62,7 @@ module game_fsm (
     wire [5:0] cm_src; // checkmate detection candidate source square
     wire [5:0] cm_dst; // checkmate detection candidate destination square
     wire candidates_exhausted; // flag set when all checkmate prevention candidates have been exhausted
+    wire cm_skip; // flag to skip an invalid candidate
     
     // Inputs to cm module
     reg cm_advance; // flag for checkmate detection to increment to the next candidate
@@ -71,6 +72,7 @@ module game_fsm (
 
     // Checkmate Detection Module Instantiation
     checkmate_detection cm_inst (
+        .clk(ClkPort), .reset(reset),
         .board_flat(board_flat),
         .current_turn(current_turn),
         .attacker_pos_latched(attacker_pos_latched),
@@ -78,7 +80,8 @@ module game_fsm (
         .cm_advance(cm_advance),
         .cm_src(cm_src),
         .cm_dst(cm_dst),
-        .candidates_exhausted(candidates_exhausted)
+        .candidates_exhausted(candidates_exhausted),
+        .cm_skip(cm_skip)
     );
 
     always @(posedge clk, posedge reset) begin
@@ -159,7 +162,7 @@ module game_fsm (
                             error_flag <= 1;
 
                         // Otherwise stay in PIECE_SELECTED (no press || (press && different square && !valid))
-                        
+
                     end
                 end
 
@@ -217,8 +220,12 @@ module game_fsm (
 
                 // CHECKMATE_DETECT state
                 CHECKMATE_DETECT: begin
-                    shadow_board_flat <= board_flat; // only latch a new shadow board, other states handle inputs and outputs to cm module
-                    state <= SHADOW_MOVING;
+                    if (cm_skip) begin
+                        cm_advance <= 1;
+                    end else begin
+                        shadow_board_flat <= board_flat; // only latch a new shadow board, other states handle inputs and outputs to cm module
+                        state <= SHADOW_MOVING;
+                    end
                 end
 
                 // MOVING state
