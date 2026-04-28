@@ -21,6 +21,7 @@ module game_fsm (
     input mcen_r, // right button mcen pulse
     input [3:0] rd_data_fsm, // read board memory
     input valid,
+    input check_1, // only used for castling check detection
     input check_2,
     input [255:0] board_flat, // current board state
     input [5:0] attacker_pos, // position of the attacker for checkmate detection
@@ -48,8 +49,9 @@ module game_fsm (
     localparam CHECK_2 = 3'b011;
     localparam CHECKMATE_DETECT = 3'b100;
     localparam MOVING = 3'b101;
-    localparam GAME_OVER = 3'b110;
-     
+    localparam CASTLE_MOVING = 3'b110;
+    localparam GAME_OVER = 3'b111;
+    
     reg move_phase; // move phase flag for MOVING state (see below)
     reg shadow_move_phase; // shadow move phase flag for SHADOW_MOVING state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
@@ -70,6 +72,13 @@ module game_fsm (
     reg [5:0] king_pos_latched; // latched king position
     reg from_checkmate; // flag to control whether a shadow move is on a checkmate_detection or check_detection operation
 
+    // Castling Initializations
+    reg white_king_moved, black_king_moved; // king moved flags
+    reg white_rook_ks_moved, white_rook_qs_moved; // white rook moved flags
+    reg black_rook_ks_moved, black_rook_qs_moved; // black rook moved flags
+    reg castle_side; // 0 = kingside, 1 = queenside // castling side flag
+    reg [1:0] castle_move_phase; // 4-write sequence for CASTLE_MOVING similar to move_phase and shadow_move_phase
+
     // Checkmate Detection Module Instantiation
     checkmate_detection cm_inst (
         .clk(clk), .reset(reset),
@@ -83,6 +92,22 @@ module game_fsm (
         .candidates_exhausted(candidates_exhausted),
         .cm_skip(cm_skip),
         .cm_init(cm_init)
+    );
+
+    wire castle_ks_en, castle_qs_en;
+
+    castling castle_inst (
+        .board_flat(board_flat),
+        .current_turn(current_turn),
+        .white_king_moved(white_king_moved),
+        .black_king_moved(black_king_moved),
+        .white_rook_ks_moved(white_rook_ks_moved),
+        .white_rook_qs_moved(white_rook_qs_moved),
+        .black_rook_ks_moved(black_rook_ks_moved),
+        .black_rook_qs_moved(black_rook_qs_moved),
+        .check(check_1),
+        .castle_ks_en(castle_ks_en),
+        .castle_qs_en(castle_qs_en)
     );
 
     always @(posedge clk, posedge reset) begin
@@ -102,12 +127,24 @@ module game_fsm (
             wr_en <= 0;
             wr_addr <= 0;
             wr_data <= 0;
+
+            // Checkmate detection resets
             attacker_pos_latched <= 0;
             king_pos_latched <= 0;
             from_checkmate <= 0;
             cm_advance <= 0;
             game_over <= 0;
             cm_init = 0;
+            white_king_moved <= 0;
+
+            // Castling resets
+            black_king_moved <= 0;
+            white_rook_ks_moved <= 0;
+            white_rook_qs_moved <= 0;
+            black_rook_ks_moved <= 0;
+            black_rook_qs_moved <= 0;
+            castle_side <= 0;
+            castle_move_phase <= 0;
         end
 
         else begin
@@ -154,6 +191,18 @@ module game_fsm (
                             state <= IDLE;
                         end 
                         
+                        // PIECE_SELECTED --> CASTLE_MOVING
+                        // If castling attempt - a castling attempt (2 right of king for king-side, 2 left of king for queen-side) is not a valid move, instead it is an exception to the valid checks, which then causes castling
+                        else if (moving_piece[2:0] == 3'b110 && cursor_row == sel_row && cursor_col == 6 && castle_ks_en) begin
+                            castle_side <= 0;
+                            piece_selected <= 0;
+                            state <= CASTLE_MOVING;
+                        end else if (moving_piece[2:0] == 3'b110 && cursor_row == sel_row && cursor_col == 2 && castle_qs_en) begin
+                            castle_side <= 1;
+                            piece_selected <= 0;
+                            state <= CASTLE_MOVING;
+                        end
+
                         // PIECE_SELECTED --> CHECK_2: if other square & if move valid
                         else if (valid) begin
                             shadow_board_flat <= board_flat; // latch board state when transitioning to shadow_moving to perform the move on the shadow board
@@ -251,9 +300,63 @@ module game_fsm (
                         cursor_row <= current_turn ? 3'd6 : 3'd1; // flip to init on the opposing player's king's pawn- white is 0 (false), if false, go to black's pawn
                         cursor_col <= 3'd4;
                         state <= IDLE;
+
+                        // moved flags for castling enable
+                        if (sel_addr == 60) white_king_moved <= 1; // white king
+                        if (sel_addr == 63) white_rook_ks_moved <= 1; // white ks rook
+                        if (sel_addr == 56) white_rook_qs_moved <= 1; // white qs rook
+                        if (sel_addr == 4) black_king_moved <= 1; // black king
+                        if (sel_addr == 7) black_rook_ks_moved <= 1; // black ks rook
+                        if (sel_addr == 0) black_rook_qs_moved <= 1; // black qs rook
                     end
                 end
                 
+                CASTLE_MOVING: begin
+                    if (castle_move_phase == 0) begin // move phase 0 -- king write (0 = black; 0 = kingside)
+                        wr_en <= 1;
+                        wr_addr <= current_turn ? (castle_side ? 6'd2 : 6'd6) : (castle_side ? 6'd58 : 6'd62);
+                        wr_data <= current_turn ? 4'b1110 : 4'b0110; // king
+                        castle_move_phase <= 1;
+                    end else if (castle_move_phase == 1) begin // move phase 1 -- original king clear
+                        wr_en <= 1;
+                        wr_addr <= current_turn ? 6'd4 : 6'd60; // clear king origin
+                        wr_data <= 4'b0000;
+                        castle_move_phase <= 2;
+                    end else if (castle_move_phase == 2) begin // move phase 2 -- rook write
+                        wr_en <= 1;
+                        wr_addr <= current_turn ? (castle_side ? 6'd3 : 6'd5) : (castle_side ? 6'd59 : 6'd61);
+                        wr_data <= current_turn ? 4'b1100 : 4'b0100; // rook
+                        castle_move_phase <= 3;
+                    end else begin // move phase 3 -- original rook clear
+                        wr_en <= 1;
+                        wr_addr <= current_turn ? (castle_side ? 6'd0 : 6'd7) : (castle_side ? 6'd56 : 6'd63);
+                        wr_data <= 4'b0000;
+                        castle_move_phase <= 0;
+
+                        // set moved flags
+                        if (current_turn) 
+                            black_king_moved <= 1;
+                        else 
+                            white_king_moved <= 1;
+                        if (current_turn) begin
+                            if (castle_side) 
+                                black_rook_qs_moved <= 1;
+                            else 
+                                black_rook_ks_moved <= 1;
+                        end else begin
+                            if (castle_side) 
+                                white_rook_qs_moved <= 1;
+                            else 
+                                white_rook_ks_moved <= 1;
+                        end
+                        
+                        current_turn <= ~current_turn; // flip turn
+                        cursor_row <= current_turn ? 3'd6 : 3'd1; // init cursor
+                        cursor_col <= 3'd4;
+                        state <= IDLE;
+                    end
+                end
+
                 // GAME_OVER state
                 GAME_OVER: begin
                     // continue to enable cursor movement (essentially for no reason but better than frozen screen)

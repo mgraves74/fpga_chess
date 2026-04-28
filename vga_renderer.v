@@ -48,6 +48,8 @@ module vga_renderer(
     input [2:0] sel_row, sel_col,
     input piece_selected,
     input error_flag,
+    input game_over,
+    input winner,
     output reg [11:0] rgb,
     output [5:0] rd_addr_renderer
     );
@@ -114,6 +116,12 @@ module vga_renderer(
     wire error_flash_vga = (vga_error_timer < 25'd20000000);
     wire is_error_sq = (sq_row == dst_row_error) && (sq_col == dst_col_error); // error square if on the latched destination - remains even after timer finishes, but does not thing if error_flash_vga is 0
 
+    // winner and looser highlighting
+    wire is_white_king_sq = (piece_type == 3'b110) && (piece_color == 1'b0);
+    wire is_black_king_sq = (piece_type == 3'b110) && (piece_color == 1'b1);
+    wire is_winner_sq = game_over && ((winner == 0 && is_white_king_sq) || (winner == 1 && is_black_king_sq));
+    wire is_loser_sq  = game_over && ((winner == 0 && is_black_king_sq) || (winner == 1 && is_white_king_sq));
+
     // calculate current pixel's board memory address so that board_memory module can provide data at that pixel
     assign rd_addr_renderer = sq_row * 8 + sq_col;
 
@@ -147,6 +155,10 @@ module vga_renderer(
             rgb = BLACK;
         else if (on_border && is_selected_sq)
             rgb = SELECTED_COLOR;
+        else if (on_border && is_winner_sq)
+            rgb = 12'h0F0;
+        else if (on_border && is_loser_sq)
+            rgb = 12'hF00;
         else if (on_border && is_error_sq && error_flash_vga)
             rgb = ERROR_COLOR;
         else if (on_border && is_cursor_sq)
