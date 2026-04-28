@@ -26,6 +26,11 @@ module game_fsm (
     input [255:0] board_flat, // current board state
     input [5:0] attacker_pos, // position of the attacker for checkmate detection
     input [5:0] king_pos, // position of the king for checkmate detection
+    input sw_queen, // switches for promotion
+    input sw_rook,
+    input sw_bishop,
+    input sw_knight,
+    input double_move,
     output reg [5:0] wr_addr, // write board memory address (write to square on board)
     output reg [3:0] wr_data, // write board memory (piece encoding)
     output reg wr_en, // write enable
@@ -35,7 +40,7 @@ module game_fsm (
     output reg [2:0] sel_col, // selected column (0-7)
     output reg piece_selected, // piece selected flag
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
-    output reg [2:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
+    output reg [3:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
     output reg error_flag, // flag to indicate that an error has been produced from an invalidated move
     output reg [255:0] shadow_board_flat, // board latched at the begging of PIECE_SELECTED for check_2 detection
     output reg game_over, // game_over flag to enable ssd and vga game over displays
@@ -43,15 +48,18 @@ module game_fsm (
     );
 
     // states 
-    localparam IDLE = 3'b000;
-    localparam PIECE_SELECTED = 3'b001;
-    localparam SHADOW_MOVING = 3'b010;
-    localparam CHECK_2 = 3'b011;
-    localparam CHECKMATE_DETECT = 3'b100;
-    localparam MOVING = 3'b101;
-    localparam CASTLE_MOVING = 3'b110;
-    localparam GAME_OVER = 3'b111;
+    localparam IDLE = 4'b0000;
+    localparam PIECE_SELECTED = 4'b0001;
+    localparam SHADOW_MOVING = 4'b0010;
+    localparam CHECK_2 = 4'b0011;
+    localparam CHECKMATE_DETECT = 4'b0100;
+    localparam MOVING = 4'b0101;
+    localparam CASTLE_MOVING = 4'b0110;
+    localparam EN_PASSANT_SHADOW_MOVING = 4'b0111;
+    localparam EN_PASSANT_MOVING = 4'b1000;
+    localparam GAME_OVER = 4'b1001;
     
+    // Regular initializations
     reg move_phase; // move phase flag for MOVING state (see below)
     reg shadow_move_phase; // shadow move phase flag for SHADOW_MOVING state (see below)
     reg [3:0] moving_piece; // register to store encoding of the moving piece
@@ -71,6 +79,7 @@ module game_fsm (
     reg [5:0] attacker_pos_latched; // latched attacker position 
     reg [5:0] king_pos_latched; // latched king position
     reg from_checkmate; // flag to control whether a shadow move is on a checkmate_detection or check_detection operation
+    reg cm_init; // flag for synchronous reset
 
     // Castling Initializations
     reg white_king_moved, black_king_moved; // king moved flags
@@ -110,6 +119,16 @@ module game_fsm (
         .castle_qs_en(castle_qs_en)
     );
 
+    // init promoted type from switches with priority -- queen is default
+    wire [2:0] promoted_type = sw_queen ? 3'b101 : (sw_rook ? 3'b100 : (sw_bishop ? 3'b011 : (sw_knight ? 3'b010 : 3'b101)));
+
+    // En passant init
+    reg en_passant_en; // en passant enable
+    reg [2:0] en_passant_file; // file of the pawn that just double-stepped
+    reg [1:0] en_passant_move_phase; // 3 phases for en passant moving - essentially a sub-state machine
+    reg [1:0] shadow_ep_move_phase; // 3 phases for shadow en passant moving
+    reg from_en_passant; // flag for   CHECK_2 to know if from en_passant shadow moving
+
     always @(posedge clk, posedge reset) begin
 
         // reset conditions
@@ -134,7 +153,7 @@ module game_fsm (
             from_checkmate <= 0;
             cm_advance <= 0;
             game_over <= 0;
-            cm_init = 0;
+            cm_init <= 0;
             white_king_moved <= 0;
 
             // Castling resets
@@ -145,6 +164,13 @@ module game_fsm (
             black_rook_qs_moved <= 0;
             castle_side <= 0;
             castle_move_phase <= 0;
+
+            // En Passant resets
+            en_passant_en <= 0;
+            en_passant_file <= 0;
+            en_passant_move_phase <= 0;
+            shadow_ep_move_phase <= 0;
+            from_en_passant <= 0;
         end
 
         else begin
@@ -203,7 +229,19 @@ module game_fsm (
                             state <= CASTLE_MOVING;
                         end
 
-                        // PIECE_SELECTED --> CHECK_2: if other square & if move valid
+                        // PIECE_SELECTED --> SHADOW_EN_PASSANT_MOVING
+                        else if (moving_piece[2:0] == 3'b001 && en_passant_en && 
+                                ((!current_turn && cursor_row == 3) || (current_turn && cursor_row == 4)) && // must be on rank 3 up from origin
+                                (cursor_col == en_passant_file) &&
+                                (cursor_col == sel_col + 1 || cursor_col == sel_col - 1)) begin
+                            piece_selected <= 0;
+                            shadow_board_flat <= board_flat;
+                            dst_addr_latched <= dst_addr;
+                            from_en_passant <= 1;
+                            state <= EN_PASSANT_SHADOW_MOVING;
+                        end
+
+                        // PIECE_SELECTED --> SHADOW_MOVING: if other square & if move valid
                         else if (valid) begin
                             shadow_board_flat <= board_flat; // latch board state when transitioning to shadow_moving to perform the move on the shadow board
                             dst_addr_latched <= dst_addr;
@@ -254,7 +292,10 @@ module game_fsm (
                             king_pos_latched <= king_pos;
                             from_checkmate <= 1; 
                             cm_init <= 1; // flag to reset (synchronously) checkmate detection counters only the first time
-                        end else // !check_2
+                        end else if (from_en_passant) begin // !check_2 but en passant occurred
+                            from_en_passant <= 0;
+                            state <= EN_PASSANT_MOVING;
+                        end else // !check_2 and regular move
                             state <= MOVING;
                     end else begin
                         if (check_2 && !candidates_exhausted) begin
@@ -268,6 +309,7 @@ module game_fsm (
                         end else begin // !check_2
                             state <= PIECE_SELECTED;  // if a candidate works then go back to PIECE_SELECTED
                             from_checkmate <= 0;
+                            from_en_passant <= 0; // you can't en passant out of check!
                         end
                     end
                 end
@@ -288,7 +330,10 @@ module game_fsm (
                     if (move_phase == 0) begin
                         wr_en <= 1;
                         wr_addr <= dst_addr; // write to destination
-                        wr_data <= moving_piece;
+                        if (moving_piece[2:0] == 3'b001 && ((!current_turn && dst_addr < 8) || (current_turn && dst_addr >= 56)))
+                            wr_data <= {current_turn, promoted_type}; // promote if pawn reaches final row depending on player
+                        else
+                            wr_data <= moving_piece;
                         move_phase <= 1; // set flag once destination is written
                     end else begin
                         wr_en <= 1;
@@ -308,6 +353,13 @@ module game_fsm (
                         if (sel_addr == 4) black_king_moved <= 1; // black king
                         if (sel_addr == 7) black_rook_ks_moved <= 1; // black ks rook
                         if (sel_addr == 0) black_rook_qs_moved <= 1; // black qs rook
+
+                        // en passant enable flag
+                        en_passant_en <= 0;
+                        if (moving_piece[2:0] == 3'b001 && double_move) begin // if double step occurs, latch en passant enable and file for the next turn
+                            en_passant_en <= 1;
+                            en_passant_file <= dst_addr_latched[2:0];
+                        end
                     end
                 end
                 
@@ -350,8 +402,48 @@ module game_fsm (
                                 white_rook_ks_moved <= 1;
                         end
                         
+                        en_passant_en <= 0;
                         current_turn <= ~current_turn; // flip turn
                         cursor_row <= current_turn ? 3'd6 : 3'd1; // init cursor
+                        cursor_col <= 3'd4;
+                        state <= IDLE;
+                    end
+                end
+
+                EN_PASSANT_SHADOW_MOVING: begin
+                    if (shadow_ep_move_phase == 0) begin
+                        shadow_board_flat[dst_addr_latched*4 +: 4] <= moving_piece;
+                        shadow_ep_move_phase <= 1;
+                    end else if (shadow_ep_move_phase == 1) begin
+                        shadow_board_flat[sel_addr*4 +: 4] <= 4'b0000;
+                        shadow_ep_move_phase <= 2;
+                    end else begin
+                        shadow_board_flat[{sel_addr[5:3], dst_addr_latched[2:0]}*4 +: 4] <= 4'b0000;
+                        shadow_ep_move_phase <= 0;
+                        state <= CHECK_2;
+                    end
+                end
+
+                EN_PASSANT_MOVING: begin
+                    if (en_passant_move_phase == 0) begin
+                        wr_en <= 1;
+                        wr_addr <= dst_addr_latched; // write destination
+                        wr_data <= moving_piece;
+                        en_passant_move_phase <= 1;
+                    end else if (en_passant_move_phase == 1) begin
+                        wr_en <= 1;
+                        wr_addr <= sel_addr;
+                        wr_data <= 4'b0000; // clear original
+                        en_passant_move_phase <= 2;
+                    end else begin
+                        wr_en <= 1;
+                        wr_addr <= {sel_addr[5:3], dst_addr_latched[2:0]}; // clear square below destination - same rank as source, same file as destination
+                        wr_data <= 4'b0000;
+                        en_passant_move_phase <= 0;
+                        en_passant_en <= 0;
+                        piece_selected <= 0;
+                        current_turn <= ~current_turn;
+                        cursor_row <= current_turn ? 3'd6 : 3'd1;
                         cursor_col <= 3'd4;
                         state <= IDLE;
                     end

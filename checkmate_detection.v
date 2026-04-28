@@ -163,6 +163,7 @@ module checkmate_detection (
     // Insantiating Move Validator for checking if candidate move to capture or blocking square is valid
     wire mv_valid;
     reg [5:0] mv_dst_sq;
+    wire dummy; // useless
 
     // defining the destination square for either capture or blocking
     always @(*) begin
@@ -173,7 +174,8 @@ module checkmate_detection (
         .board_flat(board_flat),
         .src(cm_piece_idx),
         .dst(mv_dst_sq),
-        .valid(mv_valid)
+        .valid(mv_valid),
+        .double_move(dummy)
     );
 
     // clocked always block to sequentially look at each candidate
