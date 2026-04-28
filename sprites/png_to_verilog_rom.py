@@ -63,7 +63,7 @@ def generate_rom_verilog(name, img, out_dir):
                 case_val = format(y, 'b').zfill(row_bits) + format(x, 'b').zfill(col_bits)
 
                 if a < ALPHA_THRESHOLD:
-                    color_str = "000000000000"
+                    color_str = "000000000001"
                 else:
                     r4 = (r >> 4) & 0xF
                     g4 = (g >> 4) & 0xF
@@ -73,7 +73,7 @@ def generate_rom_verilog(name, img, out_dir):
                 f.write(f"\t\t{addr_bits}'b{case_val}: color_data = 12'b{color_str};\n")
             f.write("\n")
 
-        f.write(f"\t\tdefault: color_data = 12'b000000000000;\n")
+        f.write(f"\t\tdefault: color_data = 12'b000000000001;\n")
         f.write(f"\tendcase\nendmodule\n")
 
     return file_path
