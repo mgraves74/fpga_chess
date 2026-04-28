@@ -241,12 +241,12 @@ module vga_renderer(
             4'b1100: sprite_rgb = rook_b_color;
             4'b1101: sprite_rgb = queen_b_color;
             4'b1110: sprite_rgb = king_b_color;
-            default: sprite_rgb = 12'h000;
+            default: sprite_rgb = 12'h001; // transparent -- using color close to but not actually the piece black
         endcase
     end
 
     // sprite pixel is visible when in sprite area and pixel is not transparent
-    wire sprite_pixel_active = in_sprite_area && (sprite_rgb != 12'h000);
+    wire sprite_pixel_active = in_sprite_area && (sprite_rgb != 12'h001);
 
     // actual coloring of squares with priority
     always @(*) begin
@@ -258,7 +258,7 @@ module vga_renderer(
             rgb = ERROR_COLOR;
         else if (on_border && is_cursor_sq)
             rgb = CURSOR_COLOR;
-        else if (piece_type != 3'b000)
+        else if (sprite_pixel_active)
             rgb = sprite_rgb;
         else
             rgb = is_light_square ? LIGHT_SQ : DARK_SQ;
