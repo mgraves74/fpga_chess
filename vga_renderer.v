@@ -15,26 +15,6 @@ Key Information:
 
 VGA uses 12-bit colors: R, G, B where each is a 4-bit otion- 4096 total color options
 
-Color mapping (currently not using sprite):
-White
-- Pawn: Bright white
-- Knight: Bright green
-- Bishop: Yellow
-- Rook: Orange
-- Queen: Magenta
-- King: Bright red
-
-Black
-- Pawn: Gray
-- Knight: Dark green
-- Bishop: Dark yellow
-- Rook: Dark orange
-- Queen: Dark magenta
-- King: Dark red
-
-Cursor: 4-pixel yellow border drawn around square
-Selected: 4-pixel green border drawn around square
-
 */
 
 `timescale 1ns / 1ps
