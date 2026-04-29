@@ -15,23 +15,6 @@ Key Information:
 
 VGA uses 12-bit colors: R, G, B where each is a 4-bit otion- 4096 total color options
 
-Color mapping (currently not using sprite):
-White
-- Pawn: Bright white
-- Knight: Bright green
-- Bishop: Yellow
-- Rook: Orange
-- Queen: Magenta
-- King: Bright red
-
-Black
-- Pawn: Gray
-- Knight: Dark green
-- Bishop: Dark yellow
-- Rook: Dark orange
-- Queen: Dark magenta
-- King: Dark red
-
 Cursor: 4-pixel yellow border drawn around square
 Selected: 4-pixel green border drawn around square
 
@@ -129,25 +112,132 @@ module vga_renderer(
     wire [2:0] piece_type  = rd_data_renderer[2:0]; // piece type data is 3 LSB
     wire piece_color = rd_data_renderer[3]; // piece color data is 1 MSB
 
-    // mapping board memory encodings to colors
-    reg [11:0] piece_rgb;
+    // sprite is 60x60, centered in 80x60 sq with a 10px horizontal padding
+    wire in_sprite_area = (sq_x >= 10) && (sq_x < 70);
+    wire [5:0] sprite_col = sq_x - 10; // 0-59 horizontal offset into sprite
+    wire [5:0] sprite_row = sq_y; // 0-59 vertical offset (no vertical padding)
+
+    //---------------------------//
+    // SPRITE ROM INSTANTIATIONS //
+    //---------------------------//
+
+    // init ROMs
+    wire [11:0] pawn_w_color, pawn_b_color;
+    wire [11:0] knight_w_color, knight_b_color;
+    wire [11:0] bishop_w_color, bishop_b_color;
+    wire [11:0] rook_w_color, rook_b_color;
+    wire [11:0] queen_w_color, queen_b_color;
+    wire [11:0] king_w_color, king_b_color;
+
+    pawn_w_rom pawn_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(pawn_w_color)
+    );
+
+    pawn_b_rom pawn_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(pawn_b_color)
+    );
+
+    knight_w_rom knight_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(knight_w_color)
+    );
+
+    knight_b_rom knight_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(knight_b_color)
+    );
+
+    bishop_w_rom bishop_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(bishop_w_color)
+    );
+
+    bishop_b_rom bishop_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(bishop_b_color)
+    );
+
+    rook_w_rom rook_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(rook_w_color)
+    );
+
+    rook_b_rom rook_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(rook_b_color)
+    );
+
+    queen_w_rom queen_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(queen_w_color)
+    );
+
+    queen_b_rom queen_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(queen_b_color)
+    );
+
+    king_w_rom king_w_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(king_w_color)
+    );
+
+    king_b_rom king_b_inst (
+        .clk(clk),
+        .row(sprite_row),
+        .col(sprite_col),
+        .color_data(king_b_color)
+    );
+
+    //---------------------//
+    // PIECE SPRITE MUXING //
+    //---------------------//
+
+    reg [11:0] sprite_rgb;
     always @(*) begin
         case ({piece_color, piece_type})
-            4'b0001: piece_rgb = PAWN_W;
-            4'b0010: piece_rgb = KNIGHT_W;
-            4'b0011: piece_rgb = BISHOP_W;
-            4'b0100: piece_rgb = ROOK_W;
-            4'b0101: piece_rgb = QUEEN_W;
-            4'b0110: piece_rgb = KING_W;
-            4'b1001: piece_rgb = PAWN_B;
-            4'b1010: piece_rgb = KNIGHT_B;
-            4'b1011: piece_rgb = BISHOP_B;
-            4'b1100: piece_rgb = ROOK_B;
-            4'b1101: piece_rgb = QUEEN_B;
-            4'b1110: piece_rgb = KING_B;
-            default: piece_rgb = is_light_square ? LIGHT_SQ : DARK_SQ; // squares without pieces
+            4'b0001: sprite_rgb = pawn_w_color;
+            4'b0010: sprite_rgb = knight_w_color;
+            4'b0011: sprite_rgb = bishop_w_color;
+            4'b0100: sprite_rgb = rook_w_color;
+            4'b0101: sprite_rgb = queen_w_color;
+            4'b0110: sprite_rgb = king_w_color;
+            4'b1001: sprite_rgb = pawn_b_color;
+            4'b1010: sprite_rgb = knight_b_color;
+            4'b1011: sprite_rgb = bishop_b_color;
+            4'b1100: sprite_rgb = rook_b_color;
+            4'b1101: sprite_rgb = queen_b_color;
+            4'b1110: sprite_rgb = king_b_color;
+            default: sprite_rgb = 12'h001; // transparent -- using color close to but not actually the piece black
         endcase
     end
+
+    // sprite pixel is visible when in sprite area and pixel is not transparent
+    wire sprite_pixel_active = in_sprite_area && (sprite_rgb != 12'h001);
 
     // actual coloring of squares with priority
     always @(*) begin
@@ -164,7 +254,7 @@ module vga_renderer(
         else if (on_border && is_cursor_sq)
             rgb = CURSOR_COLOR;
         else if (piece_type != 3'b000)
-            rgb = piece_rgb;
+            rgb = sprite_rgb;
         else
             rgb = is_light_square ? LIGHT_SQ : DARK_SQ;
     end
