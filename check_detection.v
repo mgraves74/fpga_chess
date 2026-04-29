@@ -69,8 +69,8 @@ end
 
 // Defining enemy pieces -- if white, enemy is black and vice versa
 wire [3:0] enemy_bishop, enemy_rook, enemy_queen, enemy_pawn, enemy_king, enemy_knight;
-assign enemy_bishop = current_turn ? 4'b0100 : 4'b1100;
-assign enemy_rook = current_turn ? 4'b0011 : 4'b1011;
+assign enemy_bishop = current_turn ? 4'b0011 : 4'b1011; // the error in the demo lol - I had the rook and bishop encodings flipped
+assign enemy_rook = current_turn ? 4'b0100 : 4'b1100;
 assign enemy_queen = current_turn ? 4'b0101 : 4'b1101;
 assign enemy_pawn = current_turn ? 4'b0001 : 4'b1001;
 assign enemy_king = current_turn ? 4'b0110 : 4'b1110;
