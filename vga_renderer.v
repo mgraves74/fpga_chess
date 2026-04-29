@@ -15,6 +15,9 @@ Key Information:
 
 VGA uses 12-bit colors: R, G, B where each is a 4-bit otion- 4096 total color options
 
+Cursor: 4-pixel yellow border drawn around square
+Selected: 4-pixel green border drawn around square
+
 */
 
 `timescale 1ns / 1ps
