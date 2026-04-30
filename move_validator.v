@@ -182,35 +182,35 @@ begin
 
         // White Pawn
         4'b0001: begin
-            if (src_row == 3'b110)
+            if (src_row == 3'b110) begin
                 valid = ((dst == (src - 16)) && (board[src - 16] == 4'b0000) && (board[src - 8] == 4'b0000)) // allowing pawn double move (if only on starting square)
                 || ((dst == (src - 8)) && (board[src - 8] == 4'b0000)) // allowing pawn first move
                 || ((dst == (src - 9)) && !dst_friendly && !dst_empty) // allowing pawn capture going up and to the left - only if opposite color and not empty
                 || ((dst == (src - 7)) && !dst_friendly && !dst_empty); // allowing pawn capture going up and to the right - only if opposite color and not empty
-                double_move = (dst == (src - 16)) && (board[src - 16] == 4'b0000) && (board[src - 8] == 4'b0000) // flag if white pawn makes a double move (for en passant)
-                
-            else
+                double_move = (dst == (src - 16)) && (board[src - 16] == 4'b0000) && (board[src - 8] == 4'b0000); // flag if white pawn makes a double move (for en passant)            
+            end else begin
                 valid = ((dst == (src - 8)) && (board[src - 8] == 4'b0000)) // repeated logic except for allowing the double move
                 || ((dst == (src - 7)) && !dst_friendly && !dst_empty)
                 || ((dst == (src - 9)) && !dst_friendly && !dst_empty);
                 double_move = 0;
-            end
+            end 
+        end
 
         // Black Pawn
         4'b1001: begin
-            if (src_row == 3'b001)
+            if (src_row == 3'b001) begin
                 valid = ((dst == (src + 16)) && (board[src + 16] == 4'b0000) && (board[src + 8] == 4'b0000)) // checking pawn double move (if only on starting square)
                 || ((dst == (src + 8)) && (board[src + 8] == 4'b0000)) // allowing pawn first move
                 || ((dst == (src + 9)) && !dst_friendly && !dst_empty) // allowing pawn capture going down and to the right
                 || ((dst == (src + 7)) && !dst_friendly && !dst_empty); // allowing pawn capture going down and to the left
                 double_move = (dst == (src + 16)) && (board[src + 16] == 4'b0000) && (board[src + 8] == 4'b0000); // flag if black pawn makes a double move (for en passant)
-  
-            else
+            end else begin
                 valid = ((dst == (src + 8)) && (board[src + 8] == 4'b0000)) // repeated logic except for allowing the double move
                 || ((dst == (src + 9)) && !dst_friendly && !dst_empty)
                 || ((dst == (src + 7)) && !dst_friendly && !dst_empty);
                 double_move = 0;
             end
+        end
 
         default: valid = 0; // including cases 4'b0000 (empty) and unused cases 4'b1000, 4'b1111, and 4'b0111
 

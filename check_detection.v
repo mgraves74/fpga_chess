@@ -83,6 +83,8 @@ reg knight_check, ray_check;
 reg [2:0] r, c; // current ray step's row and colum
 reg [3:0] target; // the piece at the current ray step
 reg blocked; // flag for stopping at the first piece
+reg [5:0] knight_attacker_pos;
+reg [5:0] ray_attacker_pos;
 
 // Knight Check
 always @(*)
@@ -92,50 +94,50 @@ begin
     // checking all 8 possible squares from the king where an enemy knight could be attacking
     if (king_row >= 2 && king_col >= 1) begin // these comparisons provide boundary checking as to not look at a wrapped around square
         if (board[(king_row-2)*8 + (king_col-1)] == enemy_knight) begin
-        knight_check = 1; // 2 up, 1 left
-        attacker_pos = (king_row-2)*8 + (king_col-1);
+            knight_check = 1; // 2 up, 1 left
+            knight_attacker_pos = (king_row-2)*8 + (king_col-1);
         end
     end
     if (king_row >= 2 && king_col <= 6) begin
         if (board[(king_row-2)*8 + (king_col+1)] == enemy_knight) begin
-        knight_check = 1; // 2 up, 1 right 
-        attacker_pos = (king_row-2)*8 + (king_col+1);
+            knight_check = 1; // 2 up, 1 right 
+            knight_attacker_pos = (king_row-2)*8 + (king_col+1);
         end
     end
     if (king_row >= 1 && king_col >= 2) begin
         if (board[(king_row-1)*8 + (king_col-2)] == enemy_knight) begin
             knight_check = 1; // 1 up, 2 left
-            attacker_pos = (king_row-1)*8 + (king_col-2);
+            knight_attacker_pos = (king_row-1)*8 + (king_col-2);
         end
     end
     if (king_row >= 1 && king_col <= 5) begin
         if (board[(king_row-1)*8 + (king_col+2)] == enemy_knight) begin
             knight_check = 1; // 1 up, 2 right
-            attacker_pos = (king_row-1)*8 + (king_col+2);
+            knight_attacker_pos = (king_row-1)*8 + (king_col+2);
         end
     end
     if (king_row <= 6 && king_col >= 2) begin
         if (board[(king_row+1)*8 + (king_col-2)] == enemy_knight) begin
             knight_check = 1; // 1 down, 2 left
-            attacker_pos = (king_row+1)*8 + (king_col-2);
+            knight_attacker_pos = (king_row+1)*8 + (king_col-2);
         end
     end
     if (king_row <= 6 && king_col <= 5) begin
         if (board[(king_row+1)*8 + (king_col+2)] == enemy_knight) begin
             knight_check = 1; // 1 down, 2 right
-            attacker_pos = (king_row+1)*8 + (king_col+2);
+            knight_attacker_pos = (king_row+1)*8 + (king_col+2);
         end
     end
     if (king_row <= 5 && king_col >= 1) begin
         if (board[(king_row+2)*8 + (king_col-1)] == enemy_knight) begin
             knight_check = 1; // 2 down, 1 left
-            attacker_pos = (king_row+2)*8 + (king_col-1);
+            knight_attacker_pos = (king_row+2)*8 + (king_col-1);
         end
     end
     if (king_row <= 5 && king_col <= 6) begin
         if (board[(king_row+2)*8 + (king_col+1)] == enemy_knight) begin
             knight_check = 1; // 2 down, 1 right
-            attacker_pos = (king_row+2)*8 + (king_col+1);
+            knight_attacker_pos = (king_row+2)*8 + (king_col+1);
         end
     end
 end
@@ -160,13 +162,13 @@ begin
                 // for 1 up, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j up, check if enemy rook or queen
                 if (target == enemy_rook || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -185,13 +187,13 @@ begin
                 // for 1 down, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j down, check if enemy rook or queen
                 if (target == enemy_rook || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -210,13 +212,13 @@ begin
                 // for 1 left, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j left, check if enemy rook or queen
                 if (target == enemy_rook || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -235,13 +237,13 @@ begin
                 // for 1 right, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j right, check if enemy rook or queen
                 if (target == enemy_rook || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -261,19 +263,19 @@ begin
                 // for 1 up-left, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for 1 up-left, if white, check if enemy pawn
                 if (j == 1 && !current_turn && target == enemy_pawn) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j up-left, check if bishop or queen
                 if (target == enemy_bishop || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -292,19 +294,19 @@ begin
                 // for 1 up-right, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for 1 up-right, if white, check if enemy pawn
                 if (j == 1 && !current_turn && target == enemy_pawn) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j up-right, check if bishop or queen
                 if (target == enemy_bishop || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -323,19 +325,19 @@ begin
                 // for 1 down-left, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for 1 down-left, if black, check if enemy pawn
                 if (j == 1 && current_turn && target == enemy_pawn) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j down-left, check if bishop or queen
                 if (target == enemy_bishop || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
@@ -354,28 +356,28 @@ begin
                 // for 1 down-right, check if enemy king
                 if (j == 1 && target == enemy_king) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for 1 down-right, if black, check if enemy pawn
                 if (j == 1 && current_turn && target == enemy_pawn) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
 
                 // for j down-right, check if bishop or queen
                 if (target == enemy_bishop || target == enemy_queen) begin
                     ray_check = 1;
-                    attacker_pos = r*8 + c;
+                    ray_attacker_pos = r*8 + c;
                 end
             end
         end
     end
-
 end
 
 always @(*) begin
     check = knight_check | ray_check;
+    attacker_pos = knight_check ? knight_attacker_pos : ray_attacker_pos;
 end
 
 endmodule

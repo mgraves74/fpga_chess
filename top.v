@@ -163,13 +163,15 @@ module vga_top(
 
 	// Check detection
 
+	wire [5:0] dumb_attacker; // unused
+	wire [5:0] dumb_king; // unused
 	// Check 1 -- current in check detection during IDLE
 	check_detection cd1(
 		.board_flat(board_flat_out),
 		.current_turn(current_turn),
 		.check(check_1),
-		.attacker_pos(attacker_pos),
-		.king_pos(king_pos)
+		.attacker_pos(dumb_attacker),
+		.king_pos(dumb_king)
 	);
 
 	// Check 2 -- moving into check detection
@@ -240,23 +242,23 @@ module vga_top(
 	*/
 
 	// Error display timer
-	reg [27:0] ssd_error_timer; // 2^28 / 100000000 = 2.684 sec
+	reg [27:0] ssd_error_timer; // 2^28 / 40000000 = 6.71 sec --- clock is 40 MHz, not 100 MHz
 
 	always @(posedge ClkPort) begin
 		if (error_flag)
 			ssd_error_timer <= 28'd0;
-		else if (ssd_error_timer < 28'd200000000) // times exactly 2 + 1/10^8 sec
+		else if (ssd_error_timer < 28'd80000000) // 2 sec
 			ssd_error_timer <= ssd_error_timer + 1;
 	end
 
-	wire error_flash_ssd = (ssd_error_timer < 28'd200000000);
+	wire error_flash_ssd = (ssd_error_timer < 28'd80000000);
 
     // Display messages with priority to move error
     assign SSD7 = error_flash_ssd ? 4'b0110: (current_turn ? 4'b0001 : 4'b1111); // I : (B : W) -- don't need to check game_over & winner since current turn is the winner
 	assign SSD6 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b1000 : 4'b0101); // L : (L : H)
 	assign SSD5 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b0111 : 4'b1110); // L : (K : T)
 	assign SSD4 = 4'b0011; // E -- blank if !error_flash_ssd
-	assign SSD3 = game_over ? 4'b0100 : 4'b1111; // W : G -- blank if !error_flash_ssd
+	assign SSD3 = game_over ? 4'b1111 : 4'b0100; // W : G -- blank if !error_flash_ssd || game_over
 	assign SSD2 = game_over ? 4'b0110 : (error_flash_ssd ? 4'b0000 : 4'b0010); // I : (A : C) -- blank if !(game_over || error_flash_ssd || check_1)
 	assign SSD1 = game_over ? 4'b1001 : (error_flash_ssd ? 4'b1000: (check_1 ? 4'b0101 : 4'b0100)); // N : (L : (H : G))
 	assign SSD0 = game_over ? 4'b1101 : (check_1 ? 4'b0111 : 4'b1010); // S (K : O) -- blank if error_flash_ssd
@@ -276,8 +278,8 @@ module vga_top(
 	assign An6 = !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 110
 	assign An5 = !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 101
 	assign An4 = error_flash_ssd ? !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 100 -- on if error_flash_ssd
-	assign An3 = error_flash_ssd ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 011 -- on if error_flash_ssd
-    assign An2 = (error_flash_ssd || check_1) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 010 -- on if error_flash_ssd
+	assign An3 = (error_flash_ssd || game_over) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 011 -- on if error_flash_ssd
+    assign An2 = (error_flash_ssd || check_1 || game_over) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 010 -- on if error_flash_ssd
 	assign An1 = !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 001
 	assign An0 = error_flash_ssd ? 1'b1 : !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 000 -- off if error_flash_ssd
 	

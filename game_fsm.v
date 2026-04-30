@@ -230,10 +230,11 @@ module game_fsm (
                         end
 
                         // PIECE_SELECTED --> SHADOW_EN_PASSANT_MOVING
-                        else if (moving_piece[2:0] == 3'b001 && en_passant_en && 
-                                ((!current_turn && cursor_row == 3) || (current_turn && cursor_row == 4)) && // must be on rank 3 up from origin
-                                (cursor_col == en_passant_file) &&
-                                (cursor_col == sel_col + 1 || cursor_col == sel_col - 1)) begin
+                        else if (moving_piece[2:0] == 3'b001 && en_passant_en && // must be pawn and en passant enabled
+                                ((!current_turn && sel_row == 3) || (current_turn && sel_row == 4)) // source pawns are side by side after the double move (for the en passant-doer, 3 normal moves up from origin)
+                                && (sel_col + 1 == en_passant_file || sel_col - 1 == en_passant_file) // validating that selected piece (source) is next to en passant file
+                                && (cursor_col == en_passant_file) // cursor (destination) must be on the file when en passant was just latched to have happened on the last turn - this is diagonal thus validating pawn diagonal capture but only for en passant file
+                                && ((!current_turn && cursor_row == sel_row - 1) || (current_turn && cursor_row == sel_row + 1))) begin // cursor (destination) must be 1 up or 1 down depending on white or black - validating pawn diagonal capture
                             piece_selected <= 0;
                             shadow_board_flat <= board_flat;
                             dst_addr_latched <= dst_addr;

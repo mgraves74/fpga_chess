@@ -6,7 +6,7 @@
 ### ClkPort
 set_property PACKAGE_PIN E3 [get_ports ClkPort]							
 	set_property IOSTANDARD LVCMOS33 [get_ports ClkPort]
-	create_clock -add -name ClkPort -period 10.00 [get_ports ClkPort]
+	create_clock -add -name ClkPort -period 25.00 [get_ports ClkPort]
 
 ### SSD CATHODES
 set_property PACKAGE_PIN T10 [get_ports {Ca}] 
@@ -130,6 +130,18 @@ set_property PACKAGE_PIN L16 [get_ports {Sw1}]
 
 set_property PACKAGE_PIN M13 [get_ports {Sw2}]
 	set_property IOSTANDARD LVCMOS33 [get_ports {Sw2}]
+
+set_property PACKAGE_PIN H6 [get_ports {Sw12}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw12}]
+
+set_property PACKAGE_PIN U12 [get_ports {Sw13}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw13}]
+
+set_property PACKAGE_PIN U11 [get_ports {Sw14}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw14}]
+
+set_property PACKAGE_PIN V10 [get_ports {Sw15}]
+	set_property IOSTANDARD LVCMOS33 [get_ports {Sw15}]
 
 ### LEDS
 set_property PACKAGE_PIN H17 [get_ports {Ld0}]

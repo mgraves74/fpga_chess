@@ -68,7 +68,6 @@ module board_mem (
 );
 
     reg [3:0] board [0:63]; // board memory init
-    assign board_out = board;
 
     // creating board_out which needs to be flattened - uses a generate-specific loop which is an elaboration time-only (when compiler is)
     // building the circuit) -- each 4-bit encoding is unpacked from its square and listed in groups consequetively
