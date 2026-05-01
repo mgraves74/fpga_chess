@@ -33,7 +33,7 @@ module vga_top(
     input Sw15, Sw14, Sw13, Sw12, Sw2, Sw1, Sw0,
 
     // leds
-    output Ld10, Ld9, Ld8, Ld7, Ld6, Ld5, Ld4, Ld3, Ld2, Ld1, Ld0
+    output Ld8, Ld7, Ld6, Ld5, Ld4, Ld3, Ld2, Ld1, Ld0
 	
 	);
 
@@ -101,17 +101,13 @@ module vga_top(
 	wire [2:0] sel_row, sel_col;
 	wire piece_selected;
 	wire current_turn;
-	wire [3:0] state;
+	wire [2:0] state;
 	wire error_flag; 
     assign rd_addr_fsm = cursor_row * 8 + cursor_col; // read address for lookups in the fsm is always the cursor position
 	wire [255:0] shadow_board_flat; // latched board state for check_2 detection
 	wire valid;
 	wire check_1;
 	wire check_2;
-	wire [5:0] attacker_pos; // position of the attacker from check_detection
-	wire [5:0] king_pos; // position of the king from check_detection
-	wire game_over; // game over flag
-	wire winner; // winner - 0 for white, 1 for black
 	wire double_move;
 
 	game_fsm gf(
@@ -128,8 +124,6 @@ module vga_top(
     	.valid(valid),
 		.check_1(check_1), .check_2(check_2),
     	.board_flat(board_flat_out), .shadow_board_flat(shadow_board_flat),
-		.attacker_pos(attacker_pos), .king_pos(king_pos),
-		.game_over(game_over), .winner(winner),
 		.sw_queen(Sw15), .sw_rook(Sw14), .sw_bishop(Sw13), .sw_knight(Sw12),
 		.double_move(double_move)
 	);
@@ -143,9 +137,7 @@ module vga_top(
 		.sel_row(sel_row), .sel_col(sel_col),
 		.piece_selected(piece_selected),
 		.rgb(rgb),
-		.error_flag(error_flag),
-		.game_over(game_over),
-		.winner(winner)
+		.error_flag(error_flag)
 	);
 
 	// Move validator
@@ -163,15 +155,11 @@ module vga_top(
 
 	// Check detection
 
-	wire [5:0] dumb_attacker; // unused
-	wire [5:0] dumb_king; // unused
 	// Check 1 -- current in check detection during IDLE
 	check_detection cd1(
 		.board_flat(board_flat_out),
 		.current_turn(current_turn),
 		.check(check_1),
-		.attacker_pos(dumb_attacker),
-		.king_pos(dumb_king)
 	);
 
 	// Check 2 -- moving into check detection
@@ -179,8 +167,6 @@ module vga_top(
 		.board_flat(shadow_board_flat),
 		.current_turn(current_turn),
 		.check(check_2),
-		.attacker_pos(attacker_pos),
-		.king_pos(king_pos)
 	);
 	
 	//-------//
@@ -197,11 +183,12 @@ module vga_top(
     
 	/*
 
-	Ld5 for piece_selected flag
+	Ld8 for piece_selected flag
 
-	Ld6 - Ld0 to show state:
-	Ld6 is GAME_OVER
-	Ld5 is CHECKMATE_DETECT
+	Ld7 - Ld0 to show state:
+	Ld7 is EN_PASSANT MOVING
+	Ldd is SHADOW_EN_PASSANT_MOVING
+	Ld5 is CASTLE_MOVING
 	Ld4 is MOVING
 	Ld3 is CHECK_2
 	Ld2 is SHADOW_MOVING
@@ -211,17 +198,15 @@ module vga_top(
 	*/
 
     // LED instantiations
-	assign Ld10 = piece_selected;
-	assign Ld9 = (state == 4'b1001) ? 1'b1 : 1'b0; // GAME_OVER
-	assign Ld8 = (state == 4'b1000) ? 1'b1 : 1'b0; // EN_PASSANT_MOVING
-	assign Ld7 = (state == 4'b0111) ? 1'b1 : 1'b0; // SHADOW_EN_PASSANT_MOVING
-	assign Ld6 = (state == 4'b0110) ? 1'b1 : 1'b0; // CASTLE_MOVING
-	assign Ld5 = (state == 4'b0101) ? 1'b1 : 1'b0; // MOVING
-	assign Ld4 = (state == 4'b0100) ? 1'b1 : 1'b0; // CHECKMATE_DETECT
-	assign Ld3 = (state == 4'b0011) ? 1'b1 : 1'b0; // CHECK_2
-	assign Ld2 = (state == 4'b0010) ? 1'b1 : 1'b0; // SHADOW_MOVING
-	assign Ld1 = (state == 4'b0001) ? 1'b1 : 1'b0; // PIECE_SELECTED
-	assign Ld0 = (state == 4'b0000) ? 1'b1 : 1'b0; // IDLE
+	assign Ld8 = piece_selected;
+	assign Ld7 = (state == 3'b111) ? 1'b1 : 1'b0; // EN_PASSANT_MOVING
+	assign Ld6 = (state == 3'b110) ? 1'b1 : 1'b0; // SHADOW_EN_PASSANT_MOVING
+	assign Ld5 = (state == 3'b101) ? 1'b1 : 1'b0; // CASTLE_MOVING
+	assign Ld4 = (state == 3'b100) ? 1'b1 : 1'b0; // MOVING
+	assign Ld3 = (state == 3'b011) ? 1'b1 : 1'b0; // CHECK_2
+	assign Ld2 = (state == 3'b010) ? 1'b1 : 1'b0; // SHADOW_MOVING
+	assign Ld1 = (state == 3'b001) ? 1'b1 : 1'b0; // PIECE_SELECTED
+	assign Ld0 = (state == 3'b000) ? 1'b1 : 1'b0; // IDLE
 
 	//------------------//
     //     SSD Code     //
@@ -231,13 +216,11 @@ module vga_top(
 	
 	SSD Display Messages:
 
-	WHT___GO - when !current_turn (white's turn) && !game_over && !error_flash && !check 
-	BLK___GO - when current_turn (black's turn) && !game_over && !error_flash && !check 
+	WHT___GO - when !current_turn (white's turn) && !error_flash && !check 
+	BLK___GO - when current_turn (black's turn) && !error_flash && !check 
 	ILLEGAL_ - if error_flash_ssd (a 2-sec display everytime a move is invalidated) (takes priority over everything except game_over)
-	WHT__CHK - when !current_turn && check_1 && !game_over && !error_flash
-	BLK__CHK - when current_turn && check_1 && !game_over && !error_flash
-	WHT_WINS - when !current_turn && game_over
-	BLK_WINS - when current_turn && game_over
+	WHT__CHK - when !current_turn && check_1 && !error_flash
+	BLK__CHK - when current_turn && check_1 && !error_flash
 
 	*/
 
@@ -254,14 +237,14 @@ module vga_top(
 	wire error_flash_ssd = (ssd_error_timer < 28'd80000000);
 
     // Display messages with priority to move error
-    assign SSD7 = error_flash_ssd ? 4'b0110: (current_turn ? 4'b0001 : 4'b1111); // I : (B : W) -- don't need to check game_over & winner since current turn is the winner
+	assign SSD7 = error_flash_ssd ? 4'b0110: (current_turn ? 4'b0001 : 4'b1111); // I : (B : W)
 	assign SSD6 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b1000 : 4'b0101); // L : (L : H)
 	assign SSD5 = error_flash_ssd ? 4'b1000: (current_turn ? 4'b0111 : 4'b1110); // L : (K : T)
 	assign SSD4 = 4'b0011; // E -- blank if !error_flash_ssd
-	assign SSD3 = game_over ? 4'b1111 : 4'b0100; // W : G -- blank if !error_flash_ssd || game_over
-	assign SSD2 = game_over ? 4'b0110 : (error_flash_ssd ? 4'b0000 : 4'b0010); // I : (A : C) -- blank if !(game_over || error_flash_ssd || check_1)
-	assign SSD1 = game_over ? 4'b1001 : (error_flash_ssd ? 4'b1000: (check_1 ? 4'b0101 : 4'b0100)); // N : (L : (H : G))
-	assign SSD0 = game_over ? 4'b1101 : (check_1 ? 4'b0111 : 4'b1010); // S (K : O) -- blank if error_flash_ssd
+	assign SSD3 = 4'b0100; // G -- blank if !error_flash_ssd
+	assign SSD2 = error_flash_ssd ? 4'b0000 : 4'b0010; // A : C -- blank if !(error_flash_ssd || check_1)
+	assign SSD1 = error_flash_ssd ? 4'b1000: (check_1 ? 4'b0101 : 4'b0100); // L : (H : G)
+	assign SSD0 = check_1 ? 4'b0111 : 4'b1010; // K : O -- blank if error_flash_ssd
     
     /*
 	Scan clock for the SSD display - all 8 SSDs
@@ -278,8 +261,8 @@ module vga_top(
 	assign An6 = !((ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 110
 	assign An5 = !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 101
 	assign An4 = error_flash_ssd ? !((ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 100 -- on if error_flash_ssd
-	assign An3 = (error_flash_ssd || game_over) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 011 -- on if error_flash_ssd
-    assign An2 = (error_flash_ssd || check_1 || game_over) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 010 -- on if error_flash_ssd
+	assign An3 = error_flash_ssd ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && (ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 011 -- on if error_flash_ssd
+    assign An2 = (error_flash_ssd || check_1) ? !(~(ssdscan_clk[2]) && (ssdscan_clk[1]) && ~(ssdscan_clk[0])) : 1'b1; // when ssdscan_clk = 010 -- on if error_flash_ssd
 	assign An1 = !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && (ssdscan_clk[0])); // when ssdscan_clk = 001
 	assign An0 = error_flash_ssd ? 1'b1 : !(~(ssdscan_clk[2]) && ~(ssdscan_clk[1]) && ~(ssdscan_clk[0])); // when ssdscan_clk = 000 -- off if error_flash_ssd
 	
