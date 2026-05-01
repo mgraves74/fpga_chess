@@ -45,21 +45,6 @@ module vga_renderer(
     parameter SELECTED_COLOR = 12'h0F0; // selected square color
     parameter ERROR_COLOR = 12'hF00; // red error color
 
-    // Currently the pieces are represented by colors not sprites -- see color mapping in Key Information
-    parameter PAWN_W   = 12'hFFF;
-    parameter KNIGHT_W = 12'h0F0;
-    parameter BISHOP_W = 12'hFF0;
-    parameter ROOK_W   = 12'hF80;
-    parameter QUEEN_W  = 12'hF0F;
-    parameter KING_W   = 12'hF00;
-
-    parameter PAWN_B   = 12'h888;
-    parameter KNIGHT_B = 12'h060;
-    parameter BISHOP_B = 12'h880;
-    parameter ROOK_B   = 12'h840;
-    parameter QUEEN_B  = 12'h808;
-    parameter KING_B   = 12'h400;
-
     // Offset to start at beginning of visible area
     wire [9:0] x = hCount - 144;
     wire [9:0] y = vCount - 35;
