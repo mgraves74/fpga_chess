@@ -197,12 +197,15 @@ module vga_top(
     
 	/*
 
-	Ld5 for piece_selected flag
+	Ld10 for piece_selected flag
 
-	Ld6 - Ld0 to show state:
-	Ld6 is GAME_OVER
-	Ld5 is CHECKMATE_DETECT
-	Ld4 is MOVING
+	Ld9 - Ld0 to show state:
+	Ld9 is GAME_OVER
+	Ld8 is EN_PASSANT_MOVING
+	Ld7 is SHADOW_EN_PASSANT_MOVING
+	Ld6 is CASTLE_MOVING
+	Ld5 is MOVING
+	Ld4 is CHECKMATE_DETECT
 	Ld3 is CHECK_2
 	Ld2 is SHADOW_MOVING
 	Ld1 is PIECE_SELECTED
