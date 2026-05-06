@@ -222,10 +222,6 @@ module vga_renderer(
             rgb = BLACK;
         else if (on_border && is_selected_sq)
             rgb = SELECTED_COLOR;
-        else if (on_border && is_winner_sq)
-            rgb = 12'h0F0;
-        else if (on_border && is_loser_sq)
-            rgb = 12'hF00;
         else if (on_border && is_error_sq && error_flash_vga)
             rgb = ERROR_COLOR;
         else if (on_border && is_cursor_sq)

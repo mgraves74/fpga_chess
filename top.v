@@ -159,14 +159,14 @@ module vga_top(
 	check_detection cd1(
 		.board_flat(board_flat_out),
 		.current_turn(current_turn),
-		.check(check_1),
+		.check(check_1)
 	);
 
 	// Check 2 -- moving into check detection
 	check_detection cd2(
 		.board_flat(shadow_board_flat),
 		.current_turn(current_turn),
-		.check(check_2),
+		.check(check_2)
 	);
 	
 	//-------//

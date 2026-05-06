@@ -40,7 +40,7 @@ module game_fsm (
     output reg current_turn, // current turn flag - 0 for white's move, 1 for black's move
     output reg [2:0] state, // 2 bit state encoding for 3 states, exposed for showing state on LEDs
     output reg error_flag, // flag to indicate that an error has been produced from an invalidated move
-    output reg [255:0] shadow_board_flat, // board latched at the begging of PIECE_SELECTED for check_2 detection
+    output reg [255:0] shadow_board_flat // board latched at the begging of PIECE_SELECTED for check_2 detection
     );
 
     // states 

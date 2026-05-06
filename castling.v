@@ -101,39 +101,30 @@ module castling (
     end
 
     wire ks_in_between_check, ks_dest_check, qs_in_between_check, qs_dest_check; // init check flags
-    wire [5:0] ap0, kp0, ap1, kp1, ap2, kp2, ap3, kp3; // dummy variables that do nothing
 
     // Check detection instantiations
     check_detection cd_ks_in_between (
         .board_flat(board_king_at_ks_in_between),
         .current_turn(current_turn),
-        .check(ks_in_between_check),
-        .attacker_pos(ap0),
-        .king_pos(kp0)
+        .check(ks_in_between_check)
     );
 
     check_detection cd_ks_dest (
         .board_flat(board_king_at_ks_dest),
         .current_turn(current_turn),
-        .check(ks_dest_check),
-        .attacker_pos(ap1),
-        .king_pos(kp1)
+        .check(ks_dest_check)
     );
 
     check_detection cd_qs_in_between (
         .board_flat(board_king_at_qs_in_between),
         .current_turn(current_turn),
-        .check(qs_in_between_check),
-        .attacker_pos(ap2),
-        .king_pos(kp2)
+        .check(qs_in_between_check)
     );
 
     check_detection cd_qs_dest (
         .board_flat(board_king_at_qs_dest),
         .current_turn(current_turn),
-        .check(qs_dest_check),
-        .attacker_pos(ap3),
-        .king_pos(kp3)
+        .check(qs_dest_check)
     );
 
     // final castle enable outputs
